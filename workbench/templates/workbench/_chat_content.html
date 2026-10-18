@@ -1,0 +1,40 @@
+{% if case %}
+  <div class="chat-heading"><h1>聊聊这件事</h1><a class="text-link" href="{% url 'home' %}">新对话</a></div>
+{% else %}
+  <div class="chat-heading chat-heading-new"><h1>聊聊你正在想的事</h1><p>写下一个问题、一次犹豫，或者还没想清楚的想法。</p></div>
+{% endif %}
+<div class="chat-messages" data-chat-messages aria-label="对话记录">
+  {% if case %}
+    <article class="chat-message chat-message-user"><div class="chat-author">你</div><div class="chat-copy">{{ case.situation }}</div></article>
+    {% for message in entries %}
+      <article class="chat-message chat-message-{{ message.role }}"><div class="chat-author">{% if message.role == 'user' %}你{% else %}AI{% endif %}{% if message.is_demo %}<span class="demo-badge">演示回复</span>{% endif %}</div><div class="chat-copy">{{ message.content }}</div>
+        {% if message.references.versions or message.references.observations %}<details class="chat-citations"><summary>查看引用</summary>{% for ref in message.references.versions %}<a class="text-link" href="{% url 'version_detail' ref %}">原则版本 {{ ref }}</a>{% endfor %}{% for ref in message.references.observations %}<a class="text-link" href="{% url 'observation_detail' ref %}">经历 {{ ref }}</a>{% endfor %}</details>{% endif %}
+      </article>
+    {% endfor %}
+  {% endif %}
+</div>
+<form class="chat-composer" action="{{ send_url }}" method="post" data-chat-form>
+  {% csrf_token %}{{ chat_form.operation_key }}{{ chat_form.revision }}{{ chat_form.depth }}{{ chat_form.config_token }}
+  {% if chat_form.errors %}<div class="form-errors" role="alert">{{ chat_form.non_field_errors }}{{ chat_form.content.errors }}</div>{% endif %}
+  <label class="visually-hidden" for="chat-content">{% if case %}继续聊{% else %}想聊什么？{% endif %}</label>
+  <textarea id="chat-content" name="content" rows="4" maxlength="20000" placeholder="{% if case %}继续补充，或问一个新问题…{% else %}比如：最近有件事让我有点犹豫…{% endif %}" {% if not needs_reply %}required{% endif %} aria-describedby="chat-send-note">{{ chat_form.content.value|default_if_none:'' }}</textarea>
+  <div class="chat-composer-actions"><span class="chat-key-hint">Ctrl / ⌘ + Enter 发送</span><div><button class="button button-quiet" type="submit" name="action" value="save">仅保存</button><button class="button button-primary" type="submit" name="action" value="send" data-chat-send>{% if needs_reply %}继续回复{% else %}发送{% endif %}</button></div></div>
+  <p class="chat-send-note" id="chat-send-note">{% if ai_status.provider == 'demo' %}当前为演示模式，回复不来自真实模型。{% else %}发送时会调用{% if ai_status.provider == 'codex' %} Codex{% else %}已选模型 API（可能计费）{% endif %}，使用此对话和相关参考。{% endif %}正式原则和选择由你另行确认。</p>
+  <p class="chat-progress" data-chat-progress role="status" aria-live="polite" hidden></p>
+  <div class="chat-error" data-chat-error role="alert" hidden><p data-chat-error-text></p><a class="text-link" href="{% url 'settings' %}">检查模型连接</a><a class="text-link" data-chat-saved-link hidden>打开已保存的对话</a></div>
+  <noscript><p class="muted">发送后请等待回复，完成后会打开对话。</p></noscript>
+</form>
+{% if case %}
+  <div class="chat-tools"><a class="text-link" href="{% url 'decision_create' case.id %}">记录我的选择</a><details class="chat-options"><summary>参考与更多操作</summary><div class="chat-options-body">
+    <p class="muted">{{ case.get_depth_display }} · 已选 {{ references|length }} 条原则、{{ experiences|length }} 条经历</p>
+    {% for version in references %}<a class="text-link" href="{% url 'version_detail' version.id %}">{{ version.title }} · v{{ version.number }}</a>{% endfor %}
+    {% for observation in experiences %}<a class="text-link" href="{% url 'observation_detail' observation.id %}">{{ observation.facts|truncatechars:40 }}</a>{% endfor %}
+    <a class="text-link" href="{% url 'case_references' case.id %}">调整参考与对话深度</a>
+    <a class="text-link" href="{% url 'ai_preview' 'chat' case.id %}">查看完整发送内容</a>
+    <a class="text-link" href="{% url 'ai_preview' 'decision' case.id %}">生成选择草稿</a>
+    {% for suggestion in suggestions %}<a class="text-link" href="{% url 'suggestion_detail' suggestion.id %}">选择草稿 · {{ suggestion.created_at|date:'m-d H:i' }}</a>{% endfor %}
+    <a class="delete-link" href="{% url 'delete_preview' 'case' case.id %}">删除这段对话</a>
+  </div></details></div>
+{% else %}
+  <p class="chat-secondary"><a class="text-link" href="{% url 'source_create' %}">先存一条素材</a><a class="text-link" href="{% url 'case_list' %}">历史对话</a></p>
+{% endif %}

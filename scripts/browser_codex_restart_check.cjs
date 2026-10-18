@@ -1,0 +1,47 @@
+const { chromium } = require('playwright');
+const fs=require('node:fs'), assert=require('node:assert/strict');
+(async()=>{
+ const report=JSON.parse(fs.readFileSync('artifacts/codex-browser-acceptance.json','utf8'));
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try {
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(report.principleUrl);
+  assert.match(await page.locator('main').innerText(),/阅读可以保留自由探索/);
+  assert.match(await page.locator('main').innerText(),/候选/);
+  await page.goto(report.caseUrl);
+  assert.equal(await page.locator('.message-assistant').count(),2);
+  await page.goto(report.sourceUrl);
+  assert.match(await page.locator('.source-copy').innerText(),/虚构素材/);
+  const zip=await page.request.get('http://127.0.0.1:8766/export/');
+  assert.equal(zip.status(),200);
+  fs.writeFileSync('artifacts/codex-acceptance-export.zip',await zip.body());
+  await page.goto('http://127.0.0.1:8766/settings/');
+  assert.equal(await page.locator('[data-codex-auth]').isVisible(),false);
+  assert.equal(await page.locator('[data-codex-login-cancel]').isVisible(),false);
+  await page.locator('#id_ai_provider').selectOption('api');
+  await page.locator('#id_confirmed').check();
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'确认保存',exact:true}).click()]);
+  assert.equal(await page.locator('#id_ai_provider').inputValue(),'api');
+  assert.match(await page.locator('[data-ai-status-label]').innerText(),/API/);
+  await page.locator('#id_ai_provider').selectOption('codex');
+  await page.locator('#id_confirmed').check();
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'确认保存',exact:true}).click()]);
+  assert.equal(await page.locator('#id_ai_provider').inputValue(),'codex');
+  await page.getByRole('button',{name:'刷新状态',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-ai-status-label]').textContent==='已连接',{timeout:45000});
+  await page.screenshot({path:'artifacts/codex-settings-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1));
+  await page.screenshot({path:'artifacts/codex-settings-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('http://127.0.0.1:8765/settings/');
+  assert.equal(await page.locator('#id_ai_provider').inputValue(),'codex');
+  await page.getByRole('button',{name:'刷新状态',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-ai-status-label]').textContent==='已连接',{timeout:45000});
+  await page.screenshot({path:'artifacts/formal-codex-settings.png',fullPage:true});
+  assert.deepEqual(errors,[]);
+  fs.writeFileSync('artifacts/codex-restart-check.json',JSON.stringify({passed:true,persistedCandidate:true,assistantMessages:2,exportDownloaded:true,providerSwitch:'codex → api → codex',formalConnected:true,errors},null,2));
+  console.log('PASS restart persistence, export, provider switching, hidden panels, formal ChatGPT connection');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,16 @@
+annotated-types==0.8.0
+asgiref==3.12.1
+Django==5.2.18
+openai-codex==0.162.1
+openai-codex-cli-bin==0.162.1
+packaging==26.3
+pillow==12.1.0
+pydantic==2.14.1
+pydantic_core==2.50.1
+sqlparse==0.6.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+tzdata==2026.5
+fastembed==0.9.0
+rapidocr-onnxruntime==1.4.4
+onnxruntime==1.31.0

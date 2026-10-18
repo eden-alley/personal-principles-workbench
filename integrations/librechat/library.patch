@@ -1,0 +1,3083 @@
+diff --git a/api/server/index.js b/api/server/index.js
+index 8477c3b..a924009 100644
+--- a/api/server/index.js
++++ b/api/server/index.js
+@@ -446,6 +446,7 @@ const startServer = async () => {
+   app.use('/api/agents', routes.agents);
+   app.use('/api/banner', routes.banner);
+   app.use('/api/memories', routes.memories);
++  app.use('/api/library', require('./routes/library'));
+   app.use('/api/schedules', rejectScheduleWritesUntilReady, routes.schedules);
+   app.use('/api/permissions', routes.accessPermissions);
+ 
+diff --git a/client/src/components/Chat/Header.tsx b/client/src/components/Chat/Header.tsx
+index 1f1b9da..19d1147 100644
+--- a/client/src/components/Chat/Header.tsx
++++ b/client/src/components/Chat/Header.tsx
+@@ -10,6 +10,7 @@ import {
+ import { OpenSidebar, PresetsMenu, NewChat, HeaderMenu } from './Menus';
+ import { TemporaryChat, TemporaryChatIndicator } from './TemporaryChat';
+ import ModelSelector from './Menus/Endpoints/ModelSelector';
++import { LibraryButton } from '~/components/Library/Dialog';
+ import { BackgroundTasksButton } from './BackgroundTasks';
+ import { TraceButton, useTraceControl } from './Trace';
+ import { useGetStartupConfig } from '~/data-provider';
+@@ -112,6 +113,9 @@ function Header({
+       </div>
+ 
+       <div className={cn('flex flex-shrink-0 items-center gap-2', hiddenBehindNav)}>
++        {!readOnly && parentConversationId == null && interfaceConfig.library === true && (
++          <LibraryButton conversationId={isNewChat ? undefined : routeConversationId} />
++        )}
+         {hasAccessToTemporaryChat === true && <TemporaryChatIndicator />}
+         {!isNewChat && <NewChat className="md:hidden" />}
+         {!isNewChat && parentConversationId == null && (
+diff --git a/client/src/components/Chat/Messages/Message.tsx b/client/src/components/Chat/Messages/Message.tsx
+index 9accb6b..42f954f 100644
+--- a/client/src/components/Chat/Messages/Message.tsx
++++ b/client/src/components/Chat/Messages/Message.tsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import type { TMessageProps } from '~/common';
+ import { useMessageProcess, useMemoizedChatContext } from '~/hooks';
++import LibraryControls from '~/components/Library/Controls';
+ import { areMessageRowPropsEqual } from '~/utils';
+ import MessageRender from './ui/MessageRender';
+ 
+@@ -44,6 +45,11 @@ function Message(props: TMessageProps) {
+           latestMessageId={latestMessageId}
+           latestMessageDepth={latestMessageDepth}
+         />
++        <LibraryControls
++          message={message}
++          isSubmitting={effectiveIsSubmitting}
++          isSearchView={props.isSearchView}
++        />
+       </div>
+     </MessageContainer>
+   );
+diff --git a/client/src/components/Messages/MessageContent.tsx b/client/src/components/Messages/MessageContent.tsx
+index cdb0a5b..f1d9f1b 100644
+--- a/client/src/components/Messages/MessageContent.tsx
++++ b/client/src/components/Messages/MessageContent.tsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import type { TMessageProps } from '~/common';
+ import { useMessageProcess, useMemoizedChatContext } from '~/hooks';
++import LibraryControls from '~/components/Library/Controls';
+ import { areMessageRowPropsEqual } from '~/utils';
+ import ContentRender from './ContentRender';
+ 
+@@ -44,6 +45,11 @@ function MessageContent(props: TMessageProps) {
+           latestMessageId={latestMessageId}
+           latestMessageDepth={latestMessageDepth}
+         />
++        <LibraryControls
++          message={message}
++          isSubmitting={effectiveIsSubmitting}
++          isSearchView={props.isSearchView}
++        />
+       </div>
+     </MessageContainer>
+   );
+diff --git a/client/src/locales/en/translation.json b/client/src/locales/en/translation.json
+index 2d81936..64b2b68 100644
+--- a/client/src/locales/en/translation.json
++++ b/client/src/locales/en/translation.json
+@@ -3057,5 +3057,122 @@
+   "com_insights_invalid_date_range": "Choose an end date after the start date, within {{days}} days.",
+   "com_insights_sparkline_accessibility": "{{label}} over time",
+   "com_nav_mobile_drawer_strip": "Show chat beside the sidebar on mobile",
+-  "com_nav_mobile_drawer_strip_info": "The sidebar stops short of the edge so a strip of the conversation stays visible. Tapping it closes the sidebar."
++  "com_nav_mobile_drawer_strip_info": "The sidebar stops short of the edge so a strip of the conversation stays visible. Tapping it closes the sidebar.",
++  "com_ui_library_title": "个人资料库",
++  "com_ui_library_add_source": "新增素材",
++  "com_ui_library_source_add_hint": "放入原文或附件，保存后自动整理摘要、要点、主题和相关素材。原件保留，不会自动变成你的原则。",
++  "com_ui_library_source_title": "标题（可选）",
++  "com_ui_library_source_text": "素材原文",
++  "com_ui_library_source_url": "来源网址（可选，不自动抓取正文）",
++  "com_ui_library_source_files": "上传图片或文本",
++  "com_ui_library_source_files_hint": "支持 PNG、JPEG、WebP、TXT、Markdown，最多4个附件、合计2MB。更大的文件可在聊天中上传后收藏。",
++  "com_ui_library_source_files_limit": "附件超过限制：最多4个，合计不超过2MB。",
++  "com_ui_library_source_read_failed": "文件未能读取或类型不受支持，请选择图片或文本文件；素材尚未保存。",
++  "com_ui_library_save_organize": "保存并自动整理",
++  "com_ui_library_organization": "AI整理",
++  "com_ui_library_organization_hint": "AI整理供理解和查找，请核对原文依据；不代表你认同。程序核对引文是否存在，不保证归纳完全准确。使用当前 Codex 账号额度。",
++  "com_ui_library_organization_pending": "已加入后台整理，解析完成后会自动处理。你可以关闭这里继续聊天。",
++  "com_ui_library_organization_blocked": "还没有可整理的正文。若只有网址，请补充正文；图片解析失败时可重试解析。",
++  "com_ui_library_organization_failed": "本次整理未完成，原件仍在。可稍后重新整理。",
++  "com_ui_library_organization_not_started": "这份素材尚未整理。旧素材不会自动批量处理。",
++  "com_ui_library_organization_stale": "原记录状态已变化，可重新整理以更新结果。",
++  "com_ui_library_organization_previous": "以下保留上次整理结果，本次尚未完成更新。",
++  "com_ui_library_organize_now": "整理这份素材",
++  "com_ui_library_organize_retry": "重新整理",
++  "com_ui_library_point_evidence": "查看原文依据",
++  "com_ui_library_related_sources": "与已有素材的联系",
++  "com_ui_library_relation_evidence": "查看两份原文依据",
++  "com_ui_library_relation_similar": "相近或重复",
++  "com_ui_library_relation_complements": "补充观点",
++  "com_ui_library_relation_contradicts": "观点有冲突",
++  "com_ui_library_topic_filter": "按主题查看",
++  "com_ui_library_all_topics": "全部主题",
++  "com_ui_library_loading": "正在读取资料…",
++  "com_ui_library_retry": "重试",
++  "com_ui_library_error": "操作未完成，请重试。若仍失败，请检查资料库服务。",
++  "com_ui_library_conflict": "记录已发生变化，尚未保存这次修改。请重新打开最新记录后再确认。",
++  "com_ui_library_too_large": "素材超过可处理大小，请缩小附件后重试。",
++  "com_ui_library_source": "素材",
++  "com_ui_library_principle": "原则",
++  "com_ui_library_experience": "经历",
++  "com_ui_library_add_principle": "新增原则",
++  "com_ui_library_add_experience": "记录经历",
++  "com_ui_library_edit_principle": "编辑并保存新版本",
++  "com_ui_library_principle_hint": "只保存你确认愿意参考的判断；修订会保留旧版本。",
++  "com_ui_library_experience_hint": "记录你确认发生过的事实，把解释和未知说清楚。",
++  "com_ui_library_statement": "原则表述",
++  "com_ui_library_facts": "经历事实",
++  "com_ui_library_reason": "理由",
++  "com_ui_library_revision_reason": "修订原因（必填）",
++  "com_ui_library_sources": "关联素材",
++  "com_ui_library_experiences": "关联经历",
++  "com_ui_library_no_associations": "暂无可关联记录。",
++  "com_ui_library_unavailable_association": "原有关联不可用：{{id}}（取消勾选可移除关联）",
++  "com_ui_library_saving": "正在保存…",
++  "com_ui_library_confirm_save": "确认保存",
++  "com_ui_library_content": "内容",
++  "com_ui_library_original": "原文",
++  "com_ui_library_original_state": "原始内容",
++  "com_ui_library_preserved": "已收藏",
++  "com_ui_library_parse_state": "文字解析",
++  "com_ui_library_index_state": "检索索引",
++  "com_ui_library_pending": "处理中",
++  "com_ui_library_ready": "已就绪",
++  "com_ui_library_failed": "失败",
++  "com_ui_library_unavailable": "未就绪",
++  "com_ui_library_transcript": "查看解析文字",
++  "com_ui_library_no_transcript": "暂无可检索的解析文字；收藏原件不代表已经能够按内容找回。",
++  "com_ui_library_no_text": "暂无文字，原始附件见下方。",
++  "com_ui_library_source_hint": "这是收藏素材，收藏不代表你认同其中观点。",
++  "com_ui_library_processing_failed": "处理未完成，原始内容仍保留。可重试解析或索引。",
++  "com_ui_library_retry_processing": "重试处理",
++  "com_ui_library_download": "下载原件：{{name}}",
++  "com_ui_library_associations": "关联依据",
++  "com_ui_library_versions": "查看历史版本",
++  "com_ui_library_version": "版本 {{version}}",
++  "com_ui_library_remove": "移入回收站",
++  "com_ui_library_restore": "恢复记录",
++  "com_ui_library_remove_hint": "移入回收站后不再用于后续自动检索，可在回收站恢复。此操作不会永久删除原件。",
++  "com_ui_library_remove_confirm": "输入完整标题“{{title}}”确认移除",
++  "com_ui_library_confirm_remove": "确认移入回收站",
++  "com_ui_library_hint": "素材、原则和经历分别保存。聊天主要参考已确认原则，相关素材与经历按需补充。",
++  "com_ui_library_export": "导出资料 JSON",
++  "com_ui_library_conversation": "本对话参考设置",
++  "com_ui_library_selected_count": "已选 {{count}} / 5 条",
++  "com_ui_library_selection_hint": "最多指定 5 条参考；指定素材仍不代表认同。排除的记录不再用于本对话后续回答。",
++  "com_ui_library_proposals_enabled": "允许回答中顺势建议保存（仍需确认）",
++  "com_ui_library_select_conversation": "指定为本对话参考（最多 5 条）",
++  "com_ui_library_exclude_conversation": "从本对话后续参考中排除",
++  "com_ui_library_selected": "指定参考",
++  "com_ui_library_excluded": "已排除",
++  "com_ui_library_unselect": "取消指定",
++  "com_ui_library_include_again": "允许再引用",
++  "com_ui_library_new_conversation_hint": "发送第一条消息后，可为本对话指定参考和调整保存建议。",
++  "com_ui_library_categories": "资料类型",
++  "com_ui_library_trash": "回收站",
++  "com_ui_library_trash_empty": "回收站为空。",
++  "com_ui_library_empty": "暂无此类记录。收藏素材或确认一条值得保留的判断后，会出现在这里。",
++  "com_ui_library_choose_entry": "选择一条记录查看内容、来源和版本，或新增原则与经历。",
++  "com_ui_library_collect": "收藏为素材",
++  "com_ui_library_collected": "素材已收藏，后台将自动整理。不会自动作为原则保存。",
++  "com_ui_library_view": "查看记录",
++  "com_ui_library_turn_unavailable": "本轮资料引用暂时无法读取",
++  "com_ui_library_references": "本轮参考 {{count}} 条资料",
++  "com_ui_library_exclude": "后续回答排除此条",
++  "com_ui_library_reference_excluded": "已排除后续引用",
++  "com_ui_library_draft_label": "待确认{{kind}}",
++  "com_ui_library_draft_hint": "可以编辑表述；只有点击确认保存后才进入长期资料库。",
++  "com_ui_library_revision_draft_hint": "这是对已有原则的修订建议；确认会新增版本，保留旧表述。",
++  "com_ui_library_draft_saved": "已确认保存。",
++  "com_ui_library_draft_dismissed": "已忽略此建议。",
++  "com_ui_library_dismiss": "忽略建议",
++  "com_ui_library_when_to_use": "适用情境",
++  "com_ui_library_boundaries": "边界",
++  "com_ui_library_revision": "记录修订 {{revision}}",
++  "com_ui_library_version_evidence": "当时关联依据（{{count}} 条）",
++  "com_ui_library_version_evidence_hint": "以下摘录保留此版本确认时的内容；记录名称使用当前标题。",
++  "com_ui_library_adopted": "当时状态：已采纳",
++  "com_ui_library_trial": "当时状态：试用",
++  "com_ui_library_candidate": "当时状态：候选",
++  "com_ui_library_retired": "当时状态：已停用"
+ }
+diff --git a/packages/api/src/index.ts b/packages/api/src/index.ts
+index c84b2d2..c3f1604 100644
+--- a/packages/api/src/index.ts
++++ b/packages/api/src/index.ts
+@@ -130,3 +130,4 @@ export type { OpenApiRouterDeps } from './openapi/router';
+ export type * from './mcp/types';
+ export type * from './flow/types';
+ export type * from './types';
++export { createLibraryRouter } from './library/router';
+diff --git a/packages/data-provider/src/config.ts b/packages/data-provider/src/config.ts
+index 8f858dd..8009032 100644
+--- a/packages/data-provider/src/config.ts
++++ b/packages/data-provider/src/config.ts
+@@ -2278,6 +2278,7 @@ export const interfaceSchema = z
+     parameters: z.boolean().optional(),
+     multiConvo: z.boolean().optional(),
+     bookmarks: z.boolean().optional(),
++    library: z.boolean().optional(),
+     memories: z.boolean().optional(),
+     presets: z.boolean().optional(),
+     prompts: z
+diff --git a/packages/data-provider/src/index.ts b/packages/data-provider/src/index.ts
+index ea5a39f..e2a24c5 100644
+--- a/packages/data-provider/src/index.ts
++++ b/packages/data-provider/src/index.ts
+@@ -84,3 +84,4 @@ export * from './codeEnvRef';
+ export * from './code/worker';
+ export * from './code/approval';
+ export * from './code/workspace';
++export * from './library';
+diff --git a/packages/data-provider/src/keys.ts b/packages/data-provider/src/keys.ts
+index 5e1e728..f83e69b 100644
+--- a/packages/data-provider/src/keys.ts
++++ b/packages/data-provider/src/keys.ts
+@@ -1,4 +1,8 @@
+ export enum QueryKeys {
++  libraryEntries = 'libraryEntries',
++  libraryEntry = 'libraryEntry',
++  libraryTurn = 'libraryTurn',
++  libraryConversation = 'libraryConversation',
+   messages = 'messages',
+   sharedMessages = 'sharedMessages',
+   sharedStartupConfig = 'sharedStartupConfig',
+@@ -112,6 +116,8 @@ export const DynamicQueryKeys = {
+ } as const;
+ 
+ export enum MutationKeys {
++  libraryWrite = 'libraryWrite',
++  libraryDownload = 'libraryDownload',
+   subagentControl = 'subagentControl',
+   cancelBackgroundTasks = 'cancelBackgroundTasks',
+   enqueueAgentQueuedTurn = 'enqueueAgentQueuedTurn',
+diff --git a/packages/data-schemas/src/app/interface.ts b/packages/data-schemas/src/app/interface.ts
+index db451f1..3053a1d 100644
+--- a/packages/data-schemas/src/app/interface.ts
++++ b/packages/data-schemas/src/app/interface.ts
+@@ -50,6 +50,7 @@ export async function loadDefaultInterface({
+ 
+     // Permissions and related settings - only include if explicitly configured
+     bookmarks: interfaceConfig?.bookmarks,
++    library: interfaceConfig?.library ?? false,
+     memories: shouldDisableMemories ? false : interfaceConfig?.memories,
+     prompts: interfaceConfig?.prompts,
+     multiConvo: interfaceConfig?.multiConvo,
+diff --git a/api/server/routes/library.js b/api/server/routes/library.js
+new file mode 100644
+index 0000000..3f68d2d
+--- /dev/null
++++ b/api/server/routes/library.js
+@@ -0,0 +1,13 @@
++const { createLibraryRouter } = require('@librechat/api');
++const { requireJwtAuth, configMiddleware } = require('~/server/middleware');
++const { getMessages, getFiles } = require('~/models');
++const { getLocalFileStream } = require('~/server/services/Files/Local');
++
++module.exports = createLibraryRouter({
++  token: process.env.LIBRECHAT_BRIDGE_TOKEN,
++  requireAuth: requireJwtAuth,
++  configMiddleware,
++  getMessages,
++  getFiles,
++  getLocalFileStream,
++});
+diff --git a/client/src/components/Library/Collect.tsx b/client/src/components/Library/Collect.tsx
+new file mode 100644
+index 0000000..4d0a770
+--- /dev/null
++++ b/client/src/components/Library/Collect.tsx
+@@ -0,0 +1,56 @@
++import { useState } from 'react';
++import { Button } from '@librechat/client';
++import { libraryService } from 'librechat-data-provider';
++import { useOperationKey, useLibraryWrite } from './hooks';
++import { useLocalize } from '~/hooks';
++import { Failure } from './Feedback';
++import LibraryDialog from './Dialog';
++
++export default function Collect({
++  conversationId,
++  messageId,
++}: {
++  conversationId: string;
++  messageId: string;
++}) {
++  const localize = useLocalize();
++  const operationKey = useOperationKey();
++  const [open, setOpen] = useState(false);
++  const collect = useLibraryWrite('collect', libraryService.collect);
++  return (
++    <div className="mt-2 text-sm">
++      {collect.isSuccess ? (
++        <div className="flex flex-wrap items-center gap-2">
++          <span role="status" className="text-text-secondary">
++            {localize('com_ui_library_collected')}
++          </span>
++          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
++            {localize('com_ui_library_view')}
++          </Button>
++          <LibraryDialog
++            open={open}
++            onOpenChange={setOpen}
++            conversationId={conversationId}
++            initialId={collect.data.id}
++          />
++        </div>
++      ) : (
++        <Button
++          size="sm"
++          variant="outline"
++          disabled={collect.isLoading}
++          onClick={() =>
++            collect.mutate({
++              conversation_id: conversationId,
++              message_id: messageId,
++              operation_key: operationKey,
++            })
++          }
++        >
++          {localize(collect.isLoading ? 'com_ui_library_saving' : 'com_ui_library_collect')}
++        </Button>
++      )}
++      {collect.isError && <Failure error={collect.error} />}
++    </div>
++  );
++}
+diff --git a/client/src/components/Library/Controls.tsx b/client/src/components/Library/Controls.tsx
+new file mode 100644
+index 0000000..f932582
+--- /dev/null
++++ b/client/src/components/Library/Controls.tsx
+@@ -0,0 +1,50 @@
++import { useLocation } from 'react-router-dom';
++import type { TMessage } from 'librechat-data-provider';
++import { useGetStartupConfig } from '~/data-provider';
++import { useAuthContext } from '~/hooks/AuthContext';
++import Collect from './Collect';
++import Turn from './Turn';
++
++/** Shared/share pages have no authenticated personal-library controls. */
++export default function Controls({
++  message,
++  isSubmitting,
++  isSearchView,
++}: {
++  message: TMessage;
++  isSubmitting: boolean;
++  isSearchView?: boolean;
++}) {
++  const { isAuthenticated } = useAuthContext();
++  const { data: startupConfig } = useGetStartupConfig();
++  const { pathname } = useLocation();
++  if (
++    !isAuthenticated ||
++    startupConfig?.interface?.library !== true ||
++    pathname.startsWith('/share/') ||
++    isSearchView ||
++    !message.conversationId ||
++    message.conversationId === 'new' ||
++    !message.messageId
++  ) {
++    return null;
++  }
++  return (
++    <div className="mx-auto max-w-3xl">
++      {message.isCreatedByUser ? (
++        <Collect
++          key={message.messageId}
++          conversationId={message.conversationId}
++          messageId={message.messageId}
++        />
++      ) : (
++        <Turn
++          key={message.messageId}
++          conversationId={message.conversationId}
++          messageId={message.messageId}
++          isSubmitting={isSubmitting}
++        />
++      )}
++    </div>
++  );
++}
+diff --git a/client/src/components/Library/Dialog.tsx b/client/src/components/Library/Dialog.tsx
+new file mode 100644
+index 0000000..7b3e6d0
+--- /dev/null
++++ b/client/src/components/Library/Dialog.tsx
+@@ -0,0 +1,386 @@
++import { useEffect, useId, useRef, useState } from 'react';
++import { BookOpen } from 'lucide-react';
++import { useMutation } from '@tanstack/react-query';
++import { libraryService, MutationKeys } from 'librechat-data-provider';
++import {
++  Button,
++  OGDialog,
++  OGDialogContent,
++  OGDialogHeader,
++  OGDialogTitle,
++} from '@librechat/client';
++import type { LibraryConversation, LibraryEntry, LibraryKind } from 'librechat-data-provider';
++import { downloadBlob, useLibraryConversation, useLibraryEntries, useLibraryWrite } from './hooks';
++import { Failure, Loading } from './Feedback';
++import Entry, { useKindLabel } from './Entry';
++import { useLocalize } from '~/hooks';
++import Editor from './Editor';
++import SourceEditor from './SourceEditor';
++
++export function LibraryButton({ conversationId }: { conversationId?: string }) {
++  const localize = useLocalize();
++  const [open, setOpen] = useState(false);
++  return (
++    <>
++      <Button
++        size="icon"
++        variant="outline"
++        aria-label={localize('com_ui_library_title')}
++        onClick={() => setOpen(true)}
++        data-testid="header-library-button"
++        className="size-9 flex-shrink-0 rounded-xl bg-presentation hover:bg-surface-tertiary"
++      >
++        <BookOpen className="icon-md" aria-hidden="true" />
++      </Button>
++      <LibraryDialog open={open} onOpenChange={setOpen} conversationId={conversationId} />
++    </>
++  );
++}
++
++export default function LibraryDialog({
++  open,
++  onOpenChange,
++  conversationId,
++  initialId,
++}: {
++  open: boolean;
++  onOpenChange: (open: boolean) => void;
++  conversationId?: string;
++  initialId?: number;
++}) {
++  const localize = useLocalize();
++  return (
++    <OGDialog open={open} onOpenChange={onOpenChange}>
++      <OGDialogContent className="flex max-h-[90dvh] w-11/12 max-w-4xl flex-col overflow-hidden">
++        <OGDialogHeader>
++          <OGDialogTitle>{localize('com_ui_library_title')}</OGDialogTitle>
++        </OGDialogHeader>
++        {open && (
++          <LibraryBody
++            key={`${conversationId ?? 'new'}-${initialId ?? ''}`}
++            conversationId={conversationId}
++            initialId={initialId}
++          />
++        )}
++      </OGDialogContent>
++    </OGDialog>
++  );
++}
++
++function LibraryBody({
++  conversationId,
++  initialId,
++}: {
++  conversationId?: string;
++  initialId?: number;
++}) {
++  const localize = useLocalize();
++  const kindLabel = useKindLabel();
++  const id = useId();
++  const list = useLibraryEntries();
++  const conversation = useLibraryConversation(conversationId);
++  const [filter, setFilter] = useState<LibraryKind | 'removed'>('principle');
++  const [selectedId, setSelectedId] = useState(initialId);
++  const [sourceEditor, setSourceEditor] = useState(false);
++  const [topic, setTopic] = useState('');
++  const [editor, setEditor] = useState<{
++    kind: 'principle' | 'experience';
++    entry?: LibraryEntry;
++  }>();
++  const initialSelected = useRef(false);
++  useEffect(() => {
++    const initialEntry = list.data?.entries.find((entry) => entry.id === initialId);
++    if (!initialSelected.current && initialEntry) {
++      setFilter(initialEntry.removed ? 'removed' : initialEntry.kind);
++      initialSelected.current = true;
++    }
++  }, [initialId, list.data]);
++  const update = useLibraryWrite('conversation', libraryService.updateConversation);
++  const exportData = useMutation({
++    mutationKey: [MutationKeys.libraryDownload, 'export'],
++    mutationFn: async () =>
++      downloadBlob(
++        new Blob([JSON.stringify(await libraryService.export(), null, 2)], {
++          type: 'application/json',
++        }),
++        'personal-library.json',
++      ),
++    retry: false,
++  });
++  const entries = list.data?.entries ?? [];
++  const visible = entries.filter((item) =>
++    filter === 'removed'
++      ? item.removed
++      : !item.removed &&
++        item.kind === filter &&
++        (filter !== 'source' || !topic || item.organization?.topics?.includes(topic)),
++  );
++  const topics = [
++    ...new Set(
++      entries
++        .filter((item) => item.kind === 'source' && !item.removed)
++        .flatMap((item) => item.organization?.topics ?? []),
++    ),
++  ].sort();
++  const state = conversation.data;
++  const change = (values: Partial<LibraryConversation>) => {
++    if (conversationId && !update.isLoading) {
++      update.mutate({ conversation_id: conversationId, ...values });
++    }
++  };
++  const onSaved = (entry: LibraryEntry) => {
++    setSourceEditor(false);
++    setTopic('');
++    setEditor(undefined);
++    setSelectedId(entry.id);
++    setFilter(entry.kind);
++  };
++
++  const renderDetail = () => {
++    if (sourceEditor) {
++      return <SourceEditor onSaved={onSaved} onCancel={() => setSourceEditor(false)} />;
++    }
++    if (editor) {
++      return (
++        <Editor
++          key={editor.entry?.id ?? editor.kind}
++          kind={editor.kind}
++          entry={editor.entry}
++          entries={entries}
++          onSaved={onSaved}
++          onCancel={() => setEditor(undefined)}
++        />
++      );
++    }
++    if (selectedId != null) {
++      return (
++        <Entry
++          key={selectedId}
++          entryId={selectedId}
++          entries={entries}
++          conversation={state}
++          conversationBusy={update.isLoading}
++          onConversationChange={change}
++          onEdit={(entry) => setEditor({ kind: 'principle', entry })}
++          onOpen={(id) => {
++            setSelectedId(id);
++            setFilter('source');
++            setTopic('');
++          }}
++        />
++      );
++    }
++    return (
++      <p className="py-3 text-sm text-text-secondary">{localize('com_ui_library_choose_entry')}</p>
++    );
++  };
++
++  return (
++    <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
++      <p className="text-sm text-text-secondary">{localize('com_ui_library_hint')}</p>
++      <div className="flex flex-wrap gap-2">
++        <Button
++          size="sm"
++          onClick={() => {
++            setSourceEditor(true);
++            setEditor(undefined);
++            setFilter('source');
++          }}
++        >
++          {localize('com_ui_library_add_source')}
++        </Button>
++        <Button
++          size="sm"
++          variant="outline"
++          onClick={() => {
++            setSourceEditor(false);
++            setEditor({ kind: 'principle' });
++          }}
++        >
++          {localize('com_ui_library_add_principle')}
++        </Button>
++        <Button
++          size="sm"
++          variant="outline"
++          onClick={() => {
++            setSourceEditor(false);
++            setEditor({ kind: 'experience' });
++          }}
++        >
++          {localize('com_ui_library_add_experience')}
++        </Button>
++        <Button
++          size="sm"
++          variant="outline"
++          disabled={exportData.isLoading}
++          onClick={() => exportData.mutate()}
++        >
++          {localize('com_ui_library_export')}
++        </Button>
++      </div>
++      {exportData.isError && <Failure />}
++      {conversation.isFetching && !state && <Loading />}
++      {conversation.isError && <Failure retry={() => void conversation.refetch()} />}
++      {state && (
++        <details className="space-y-3">
++          <summary className="cursor-pointer text-sm font-medium">
++            {localize('com_ui_library_conversation')} ·{' '}
++            {localize('com_ui_library_selected_count', { count: state.selected_ids.length })}
++          </summary>
++          <p className="mt-3 text-sm text-text-secondary">
++            {localize('com_ui_library_selection_hint')}
++          </p>
++          <label htmlFor={`${id}-proposals`} className="flex items-start gap-2 text-sm">
++            <input
++              id={`${id}-proposals`}
++              type="checkbox"
++              checked={state.proposals_enabled}
++              disabled={update.isLoading}
++              onChange={(event) => change({ proposals_enabled: event.target.checked })}
++              className="mt-1"
++            />
++            <span>{localize('com_ui_library_proposals_enabled')}</span>
++          </label>
++          {(['selected_ids', 'excluded_ids'] as const).map(
++            (field) =>
++              state[field].length > 0 && (
++                <section key={field}>
++                  <h3 className="mb-2 text-sm font-medium">
++                    {localize(
++                      field === 'selected_ids'
++                        ? 'com_ui_library_selected'
++                        : 'com_ui_library_excluded',
++                    )}
++                  </h3>
++                  <ul className="space-y-2">
++                    {state[field].map((entryId) => (
++                      <li key={entryId} className="flex items-start justify-between gap-2 text-sm">
++                        <span className="break-words">
++                          {entries.find((entry) => entry.id === entryId)?.title || String(entryId)}
++                        </span>
++                        <Button
++                          size="sm"
++                          variant="outline"
++                          disabled={update.isLoading}
++                          onClick={() =>
++                            change({ [field]: state[field].filter((value) => value !== entryId) })
++                          }
++                        >
++                          {localize(
++                            field === 'selected_ids'
++                              ? 'com_ui_library_unselect'
++                              : 'com_ui_library_include_again',
++                          )}
++                        </Button>
++                      </li>
++                    ))}
++                  </ul>
++                </section>
++              ),
++          )}
++        </details>
++      )}
++      {!conversationId && (
++        <p className="text-sm text-text-secondary">
++          {localize('com_ui_library_new_conversation_hint')}
++        </p>
++      )}
++      {update.isError && <Failure error={update.error} />}
++      {list.isLoading && <Loading />}
++      {list.isError && (
++        <Failure
++          error={list.error instanceof Error ? list.error : undefined}
++          retry={() => void list.refetch()}
++        />
++      )}
++      {!list.isLoading && !list.isError && (
++        <>
++          <nav
++            aria-label={localize('com_ui_library_categories')}
++            className="flex flex-wrap gap-2 border-b border-border-light pb-3"
++          >
++            {(['principle', 'source', 'experience', 'removed'] as const).map((kind) => (
++              <Button
++                key={kind}
++                size="sm"
++                variant={filter === kind ? 'default' : 'outline'}
++                aria-pressed={filter === kind}
++                onClick={() => {
++                  setFilter(kind);
++                  setTopic('');
++                  setSourceEditor(false);
++                  setEditor(undefined);
++                  setSelectedId(undefined);
++                }}
++              >
++                {kind === 'removed' ? localize('com_ui_library_trash') : kindLabel(kind)}
++              </Button>
++            ))}
++          </nav>
++          {filter === 'source' && !sourceEditor && topics.length > 0 && (
++            <div className="flex items-center gap-3 text-sm">
++              <label htmlFor={`${id}-topic`}>{localize('com_ui_library_topic_filter')}</label>
++              <select
++                id={`${id}-topic`}
++                value={topic}
++                onChange={(event) => {
++                  setTopic(event.target.value);
++                  setSelectedId(undefined);
++                }}
++                className="min-w-0 rounded-md border border-border-light bg-surface-primary px-2 py-1"
++              >
++                <option value="">{localize('com_ui_library_all_topics')}</option>
++                {topics.map((value) => (
++                  <option key={value} value={value}>
++                    {value}
++                  </option>
++                ))}
++              </select>
++            </div>
++          )}
++          <div className="grid min-h-0 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
++            <div className="max-h-44 overflow-y-auto md:max-h-[50dvh]">
++              {visible.length === 0 ? (
++                <p className="py-3 text-sm text-text-secondary">
++                  {localize(
++                    filter === 'removed' ? 'com_ui_library_trash_empty' : 'com_ui_library_empty',
++                  )}
++                </p>
++              ) : (
++                <ul className="space-y-1">
++                  {visible.map((entry) => (
++                    <li key={entry.id}>
++                      <button
++                        type="button"
++                        onClick={() => {
++                          setSelectedId(entry.id);
++                          setSourceEditor(false);
++                          setEditor(undefined);
++                        }}
++                        aria-pressed={selectedId === entry.id}
++                        className={`w-full rounded-lg px-3 py-3 text-left text-sm hover:bg-surface-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-heavy ${selectedId === entry.id ? 'bg-surface-secondary' : ''}`}
++                      >
++                        <span className="block break-words font-medium">
++                          {entry.organization?.title || entry.title || String(entry.id)}
++                        </span>
++                        <span className="mt-1 block text-xs text-text-secondary">
++                          {kindLabel(entry.kind)}
++                          {entry.kind === 'source' && entry.organization?.topics?.length
++                            ? ` · ${entry.organization.topics.join(' / ')}`
++                            : ''}
++                        </span>
++                      </button>
++                    </li>
++                  ))}
++                </ul>
++              )}
++            </div>
++            <div className="min-w-0 md:max-h-[50dvh] md:overflow-y-auto md:pr-2">
++              {renderDetail()}
++            </div>
++          </div>
++        </>
++      )}
++    </div>
++  );
++}
+diff --git a/client/src/components/Library/Editor.tsx b/client/src/components/Library/Editor.tsx
+new file mode 100644
+index 0000000..8d1ebee
+--- /dev/null
++++ b/client/src/components/Library/Editor.tsx
+@@ -0,0 +1,169 @@
++import { useId, useState } from 'react';
++import { libraryService } from 'librechat-data-provider';
++import { Button, Input, Label, Textarea } from '@librechat/client';
++import type { LibraryEntry, LibraryKind, LibraryPrincipleInput } from 'librechat-data-provider';
++import { useOperationKey, useLibraryWrite } from './hooks';
++import { useLocalize } from '~/hooks';
++import { Failure } from './Feedback';
++
++export default function Editor({
++  kind,
++  entry,
++  entries,
++  onSaved,
++  onCancel,
++}: {
++  kind: Exclude<LibraryKind, 'source'>;
++  entry?: LibraryEntry;
++  entries: LibraryEntry[];
++  onSaved: (entry: LibraryEntry) => void;
++  onCancel: () => void;
++}) {
++  const localize = useLocalize();
++  const id = useId();
++  const operationKey = useOperationKey();
++  const [text, setText] = useState(entry?.text ?? '');
++  const [reason, setReason] = useState('');
++  const [sourceIds, setSourceIds] = useState(entry?.source_ids ?? []);
++  const [experienceIds, setExperienceIds] = useState(entry?.experience_ids ?? []);
++  const save = useLibraryWrite(
++    'save',
++    (input: LibraryPrincipleInput) =>
++      kind === 'principle'
++        ? libraryService.principle(input)
++        : libraryService.experience({
++            facts: input.statement,
++            confirmed: true,
++            operation_key: input.operation_key,
++          }),
++    onSaved,
++  );
++  const canSave = text.trim().length > 0 && (!entry || reason.trim().length > 0);
++  const createLabel =
++    kind === 'principle' ? 'com_ui_library_add_principle' : 'com_ui_library_add_experience';
++  const associations = (
++    associationKind: 'source' | 'experience',
++    ids: number[],
++    setIds: (ids: number[]) => void,
++  ) => {
++    const choices = entries.filter((item) => item.kind === associationKind && !item.removed);
++    return (
++      <fieldset className="space-y-2">
++        <legend className="text-sm font-medium">
++          {localize(
++            associationKind === 'source' ? 'com_ui_library_sources' : 'com_ui_library_experiences',
++          )}
++        </legend>
++        {choices.length === 0 && (
++          <p className="text-sm text-text-secondary">
++            {localize('com_ui_library_no_associations')}
++          </p>
++        )}
++        <div className="max-h-32 space-y-2 overflow-y-auto">
++          {choices.map((item) => (
++            <label key={item.id} className="flex items-start gap-2 text-sm">
++              <input
++                type="checkbox"
++                checked={ids.includes(item.id)}
++                disabled={save.isLoading}
++                onChange={(event) =>
++                  setIds(
++                    event.target.checked
++                      ? [...ids, item.id]
++                      : ids.filter((value) => value !== item.id),
++                  )
++                }
++                className="mt-1"
++              />
++              <span className="break-words">{item.title || String(item.id)}</span>
++            </label>
++          ))}
++        </div>
++        {ids
++          .filter((value) => !choices.some((choice) => choice.id === value))
++          .map((value) => (
++            <label key={value} className="flex gap-2 text-sm text-text-secondary">
++              <input
++                type="checkbox"
++                checked
++                disabled={save.isLoading}
++                onChange={() => setIds(ids.filter((item) => item !== value))}
++              />
++              {localize('com_ui_library_unavailable_association', { id: String(value) })}
++            </label>
++          ))}
++      </fieldset>
++    );
++  };
++
++  return (
++    <form
++      className="space-y-4"
++      onSubmit={(event) => {
++        event.preventDefault();
++        if (!canSave || save.isLoading) {
++          return;
++        }
++        save.mutate({
++          statement: text.trim(),
++          entry_id: entry?.id,
++          expected_revision: entry?.revision,
++          reason: reason.trim(),
++          source_ids: sourceIds,
++          experience_ids: experienceIds,
++          confirmed: true,
++          operation_key: operationKey,
++        });
++      }}
++    >
++      <h3 className="font-semibold">
++        {localize(entry ? 'com_ui_library_edit_principle' : createLabel)}
++      </h3>
++      <p className="text-sm text-text-secondary">
++        {localize(
++          kind === 'principle' ? 'com_ui_library_principle_hint' : 'com_ui_library_experience_hint',
++        )}
++      </p>
++      <div className="space-y-2">
++        <Label htmlFor={`${id}-text`}>
++          {localize(kind === 'principle' ? 'com_ui_library_statement' : 'com_ui_library_facts')}
++        </Label>
++        <Textarea
++          id={`${id}-text`}
++          value={text}
++          onChange={(event) => setText(event.target.value)}
++          rows={5}
++          required
++          disabled={save.isLoading}
++        />
++      </div>
++      {kind === 'principle' && (
++        <>
++          <div className="space-y-2">
++            <Label htmlFor={`${id}-reason`}>
++              {localize(entry ? 'com_ui_library_revision_reason' : 'com_ui_library_reason')}
++            </Label>
++            <Input
++              id={`${id}-reason`}
++              value={reason}
++              onChange={(event) => setReason(event.target.value)}
++              required={!!entry}
++              disabled={save.isLoading}
++            />
++          </div>
++          {associations('source', sourceIds, setSourceIds)}
++          {associations('experience', experienceIds, setExperienceIds)}
++        </>
++      )}
++      {save.isError && <Failure error={save.error} />}
++      <div className="flex flex-wrap justify-end gap-2">
++        <Button type="button" variant="outline" onClick={onCancel} disabled={save.isLoading}>
++          {localize('com_ui_cancel')}
++        </Button>
++        <Button type="submit" disabled={!canSave || save.isLoading}>
++          {localize(save.isLoading ? 'com_ui_library_saving' : 'com_ui_library_confirm_save')}
++        </Button>
++      </div>
++    </form>
++  );
++}
+diff --git a/client/src/components/Library/Entry.tsx b/client/src/components/Library/Entry.tsx
+new file mode 100644
+index 0000000..757ce67
+--- /dev/null
++++ b/client/src/components/Library/Entry.tsx
+@@ -0,0 +1,397 @@
++import { useId, useState } from 'react';
++import { useMutation } from '@tanstack/react-query';
++import { Button, Input, Label } from '@librechat/client';
++import { libraryService, MutationKeys } from 'librechat-data-provider';
++import type { LibraryConversation, LibraryEntry, LibraryKind } from 'librechat-data-provider';
++import { downloadBlob, useLibraryEntry, useLibraryWrite } from './hooks';
++import { Failure, Loading } from './Feedback';
++import { useLocalize } from '~/hooks';
++import Organization from './Organization';
++
++export function useKindLabel() {
++  const localize = useLocalize();
++  const labels = {
++    source: 'com_ui_library_source',
++    principle: 'com_ui_library_principle',
++    experience: 'com_ui_library_experience',
++  } as const;
++  return (kind: LibraryKind) => localize(labels[kind]);
++}
++
++function Status({ state }: { state?: string }) {
++  const localize = useLocalize();
++  if (['pending', 'queued', 'processing', 'running'].includes(state ?? '')) {
++    return <span>{localize('com_ui_library_pending')}</span>;
++  }
++  if (['ready', 'done', 'completed', 'indexed', 'success', 'parsed'].includes(state ?? '')) {
++    return <span>{localize('com_ui_library_ready')}</span>;
++  }
++  if (['failed', 'error'].includes(state ?? '')) {
++    return <span>{localize('com_ui_library_failed')}</span>;
++  }
++  return <span>{localize('com_ui_library_unavailable')}</span>;
++}
++
++function PrincipleStatus({ status }: { status: string }) {
++  const localize = useLocalize();
++  if (status === 'adopted') {
++    return <p className="text-text-secondary">{localize('com_ui_library_adopted')}</p>;
++  }
++  if (status === 'trial') {
++    return <p className="text-text-secondary">{localize('com_ui_library_trial')}</p>;
++  }
++  if (status === 'candidate') {
++    return <p className="text-text-secondary">{localize('com_ui_library_candidate')}</p>;
++  }
++  if (status === 'retired') {
++    return <p className="text-text-secondary">{localize('com_ui_library_retired')}</p>;
++  }
++  return null;
++}
++
++export default function Entry({
++  entryId,
++  entries,
++  conversation,
++  conversationBusy,
++  onConversationChange,
++  onEdit,
++  onOpen,
++}: {
++  entryId: number;
++  entries: LibraryEntry[];
++  conversation?: LibraryConversation;
++  conversationBusy: boolean;
++  onConversationChange: (change: Partial<LibraryConversation>) => void;
++  onEdit: (entry: LibraryEntry) => void;
++  onOpen?: (id: number) => void;
++}) {
++  const localize = useLocalize();
++  const kindLabel = useKindLabel();
++  const id = useId();
++  const entryQuery = useLibraryEntry(entryId);
++  const [removing, setRemoving] = useState(false);
++  const [confirmation, setConfirmation] = useState('');
++  const remove = useLibraryWrite(
++    'remove',
++    (input: { entry: LibraryEntry; removed: boolean }) =>
++      libraryService.remove(input.entry.id, {
++        removed: input.removed,
++        expected_revision: input.entry.revision,
++        confirmed: true,
++      }),
++    () => {
++      setRemoving(false);
++      setConfirmation('');
++    },
++  );
++  const retry = useLibraryWrite('retry', libraryService.retry);
++  const asset = useMutation({
++    mutationKey: [MutationKeys.libraryDownload, 'asset'],
++    mutationFn: async (file: { id: number; name: string }) =>
++      downloadBlob(await libraryService.asset(file.id), file.name),
++    retry: false,
++  });
++  if (entryQuery.isLoading) {
++    return <Loading />;
++  }
++  if (entryQuery.isError || !entryQuery.data) {
++    return (
++      <Failure
++        error={entryQuery.error instanceof Error ? entryQuery.error : undefined}
++        retry={() => void entryQuery.refetch()}
++      />
++    );
++  }
++  const entry = entryQuery.data;
++  const selected = conversation?.selected_ids.includes(entry.id) ?? false;
++  const excluded = conversation?.excluded_ids.includes(entry.id) ?? false;
++  const selectedIds = conversation?.selected_ids ?? [];
++  const excludedIds = conversation?.excluded_ids ?? [];
++  const linked = [...entry.source_ids, ...entry.experience_ids];
++  const exactTitle = entry.title || String(entry.id);
++  return (
++    <article className="min-w-0 space-y-4">
++      <header className="space-y-1">
++        <p className="text-sm text-text-secondary">
++          {kindLabel(entry.kind)}
++          {entry.version != null && (
++            <> · {localize('com_ui_library_version', { version: entry.version })}</>
++          )}
++        </p>
++        <h3 className="break-words font-semibold">{exactTitle}</h3>
++      </header>
++      {entry.kind === 'source' && (
++        <p className="text-sm text-text-secondary">{localize('com_ui_library_source_hint')}</p>
++      )}
++      {entry.kind === 'source' && <Organization entry={entry} entries={entries} onOpen={onOpen} />}
++      <section className="space-y-2">
++        <h4 className="text-sm font-medium">
++          {localize(entry.kind === 'source' ? 'com_ui_library_original' : 'com_ui_library_content')}
++        </h4>
++        <div className="whitespace-pre-wrap break-words text-sm">
++          {entry.text || localize('com_ui_library_no_text')}
++        </div>
++      </section>
++      {entry.kind === 'source' && (
++        <>
++          <dl className="grid grid-cols-2 gap-2 text-sm">
++            <dt>{localize('com_ui_library_original_state')}</dt>
++            <dd>{localize('com_ui_library_preserved')}</dd>
++            <dt>{localize('com_ui_library_parse_state')}</dt>
++            <dd>
++              <Status state={entry.parse_state} />
++            </dd>
++            <dt>{localize('com_ui_library_index_state')}</dt>
++            <dd>
++              <Status state={entry.index_state} />
++            </dd>
++          </dl>
++          <details>
++            <summary className="cursor-pointer text-sm font-medium">
++              {localize('com_ui_library_transcript')}
++            </summary>
++            <p className="mt-2 whitespace-pre-wrap break-words text-sm">
++              {entry.transcript || localize('com_ui_library_no_transcript')}
++            </p>
++          </details>
++          {!!entry.error_code && (
++            <p role="status" className="text-sm text-text-secondary">
++              {localize('com_ui_library_processing_failed')}
++            </p>
++          )}
++          {!entry.removed &&
++            (entry.error_code ||
++              ['failed', 'error'].includes(entry.parse_state) ||
++              ['failed', 'error'].includes(entry.index_state)) && (
++              <Button
++                size="sm"
++                variant="outline"
++                disabled={retry.isLoading}
++                onClick={() => retry.mutate(entry.id)}
++              >
++                {localize('com_ui_library_retry_processing')}
++              </Button>
++            )}
++          <ul className="space-y-2">
++            {entry.assets.map((file) => (
++              <li key={file.id}>
++                <Button
++                  size="sm"
++                  variant="outline"
++                  className="max-w-full"
++                  disabled={asset.isLoading}
++                  onClick={() => asset.mutate(file)}
++                >
++                  <span className="truncate">
++                    {localize('com_ui_library_download', { name: file.name })}
++                  </span>
++                </Button>
++              </li>
++            ))}
++          </ul>
++        </>
++      )}
++      {!!entry.reason && (
++        <section className="space-y-1">
++          <h4 className="text-sm font-medium">{localize('com_ui_library_reason')}</h4>
++          <p className="whitespace-pre-wrap break-words text-sm">{entry.reason}</p>
++        </section>
++      )}
++      {linked.length > 0 && (
++        <section className="space-y-1">
++          <h4 className="text-sm font-medium">{localize('com_ui_library_associations')}</h4>
++          <ul className="space-y-1 text-sm text-text-secondary">
++            {linked.map((linkedId) => (
++              <li key={linkedId}>
++                {entries.find((item) => item.id === linkedId)?.title || String(linkedId)}
++              </li>
++            ))}
++          </ul>
++        </section>
++      )}
++      {entry.versions.length > 0 && (
++        <details>
++          <summary className="cursor-pointer text-sm font-medium">
++            {localize('com_ui_library_versions')}
++          </summary>
++          <ol className="mt-3 space-y-4">
++            {entry.versions.map((version) => (
++              <li key={version.version} className="space-y-1 text-sm">
++                <p className="font-medium">
++                  {localize('com_ui_library_version', { version: version.version })} ·{' '}
++                  {version.created_at}
++                </p>
++                {version.title && <p className="font-medium">{version.title}</p>}
++                <PrincipleStatus status={version.status} />
++                <p className="whitespace-pre-wrap break-words">{version.text}</p>
++                {version.reason && (
++                  <p className="whitespace-pre-wrap break-words text-text-secondary">
++                    {version.reason}
++                  </p>
++                )}
++                {(version.when_to_use || version.boundaries) && (
++                  <dl className="space-y-2 text-text-secondary">
++                    {version.when_to_use && (
++                      <div>
++                        <dt className="font-medium">{localize('com_ui_library_when_to_use')}</dt>
++                        <dd className="whitespace-pre-wrap break-words">{version.when_to_use}</dd>
++                      </div>
++                    )}
++                    {version.boundaries && (
++                      <div>
++                        <dt className="font-medium">{localize('com_ui_library_boundaries')}</dt>
++                        <dd className="whitespace-pre-wrap break-words">{version.boundaries}</dd>
++                      </div>
++                    )}
++                  </dl>
++                )}
++                {!!version.evidence?.length && (
++                  <details className="pt-2">
++                    <summary className="cursor-pointer font-medium">
++                      {localize('com_ui_library_version_evidence', {
++                        count: version.evidence.length,
++                      })}
++                    </summary>
++                    <p className="mt-2 text-text-secondary">
++                      {localize('com_ui_library_version_evidence_hint')}
++                    </p>
++                    <ul className="mt-3 space-y-3">
++                      {version.evidence.map((evidence) => (
++                        <li
++                          key={`${evidence.kind}-${evidence.id}-${evidence.revision}`}
++                          className="space-y-1"
++                        >
++                          <p className="break-words font-medium">
++                            {kindLabel(evidence.kind)} ·{' '}
++                            {entries.find((item) => item.id === evidence.id)?.title ||
++                              String(evidence.id)}{' '}
++                            · {localize('com_ui_library_revision', { revision: evidence.revision })}
++                          </p>
++                          <p className="whitespace-pre-wrap break-words text-text-secondary">
++                            {evidence.excerpt}
++                          </p>
++                        </li>
++                      ))}
++                    </ul>
++                  </details>
++                )}
++              </li>
++            ))}
++          </ol>
++        </details>
++      )}
++      {!entry.removed && conversation && (
++        <fieldset className="space-y-3 border-t border-border-light pt-4">
++          <legend className="sr-only">{localize('com_ui_library_conversation')}</legend>
++          <label className="flex items-start gap-2 text-sm">
++            <input
++              type="checkbox"
++              checked={selected}
++              disabled={conversationBusy || (!selected && selectedIds.length >= 5)}
++              onChange={(event) =>
++                onConversationChange({
++                  selected_ids: event.target.checked
++                    ? [...selectedIds, entry.id]
++                    : selectedIds.filter((value) => value !== entry.id),
++                  excluded_ids: excludedIds.filter((value) => value !== entry.id),
++                })
++              }
++              className="mt-1"
++            />
++            <span>{localize('com_ui_library_select_conversation')}</span>
++          </label>
++          <label className="flex items-start gap-2 text-sm">
++            <input
++              type="checkbox"
++              checked={excluded}
++              disabled={conversationBusy}
++              onChange={(event) =>
++                onConversationChange({
++                  excluded_ids: event.target.checked
++                    ? [...excludedIds, entry.id]
++                    : excludedIds.filter((value) => value !== entry.id),
++                  selected_ids: selectedIds.filter((value) => value !== entry.id),
++                })
++              }
++              className="mt-1"
++            />
++            <span>{localize('com_ui_library_exclude_conversation')}</span>
++          </label>
++        </fieldset>
++      )}
++      <div className="flex flex-wrap gap-2 border-t border-border-light pt-4">
++        {entry.kind === 'principle' && !entry.removed && (
++          <Button size="sm" variant="outline" onClick={() => onEdit(entry)}>
++            {localize('com_ui_library_edit_principle')}
++          </Button>
++        )}
++        {entry.removed ? (
++          <Button
++            size="sm"
++            variant="outline"
++            disabled={remove.isLoading}
++            onClick={() => remove.mutate({ entry, removed: false })}
++          >
++            {localize('com_ui_library_restore')}
++          </Button>
++        ) : (
++          <Button
++            size="sm"
++            variant="outline"
++            disabled={remove.isLoading}
++            onClick={() => setRemoving(true)}
++          >
++            {localize('com_ui_library_remove')}
++          </Button>
++        )}
++      </div>
++      {removing && !entry.removed && (
++        <form
++          className="space-y-3"
++          onSubmit={(event) => {
++            event.preventDefault();
++            if (confirmation === exactTitle && !remove.isLoading) {
++              remove.mutate({ entry, removed: true });
++            }
++          }}
++        >
++          <p className="text-sm text-text-secondary">{localize('com_ui_library_remove_hint')}</p>
++          <Label htmlFor={`${id}-remove`}>
++            {localize('com_ui_library_remove_confirm', { title: exactTitle })}
++          </Label>
++          <Input
++            id={`${id}-remove`}
++            value={confirmation}
++            onChange={(event) => setConfirmation(event.target.value)}
++            disabled={remove.isLoading}
++          />
++          <div className="flex flex-wrap gap-2">
++            <Button
++              type="button"
++              size="sm"
++              variant="outline"
++              onClick={() => {
++                setRemoving(false);
++                setConfirmation('');
++              }}
++            >
++              {localize('com_ui_cancel')}
++            </Button>
++            <Button
++              type="submit"
++              size="sm"
++              variant="destructive"
++              disabled={confirmation !== exactTitle || remove.isLoading}
++            >
++              {localize('com_ui_library_confirm_remove')}
++            </Button>
++          </div>
++        </form>
++      )}
++      {remove.isError && <Failure error={remove.error} />}
++      {retry.isError && <Failure error={retry.error} />}
++      {asset.isError && <Failure />}
++    </article>
++  );
++}
+diff --git a/client/src/components/Library/Feedback.tsx b/client/src/components/Library/Feedback.tsx
+new file mode 100644
+index 0000000..8671781
+--- /dev/null
++++ b/client/src/components/Library/Feedback.tsx
+@@ -0,0 +1,36 @@
++import { Button, Spinner } from '@librechat/client';
++import { LibraryRequestError } from 'librechat-data-provider';
++import { useLocalize } from '~/hooks';
++
++export function Loading() {
++  const localize = useLocalize();
++  return (
++    <div role="status" className="flex items-center gap-2 py-4 text-sm text-text-secondary">
++      <Spinner className="size-4" />
++      {localize('com_ui_library_loading')}
++    </div>
++  );
++}
++
++export function Failure({ error, retry }: { error?: Error | null; retry?: () => void }) {
++  const localize = useLocalize();
++  const status = error instanceof LibraryRequestError ? error.status : 0;
++  let key: 'com_ui_library_conflict' | 'com_ui_library_too_large' | 'com_ui_library_error' =
++    'com_ui_library_error';
++  if (status === 409) {
++    key = 'com_ui_library_conflict';
++  }
++  if (status === 413) {
++    key = 'com_ui_library_too_large';
++  }
++  return (
++    <div role="alert" className="space-y-2 py-2 text-sm text-text-secondary">
++      <p>{localize(key)}</p>
++      {retry && (
++        <Button size="sm" variant="outline" onClick={retry}>
++          {localize('com_ui_library_retry')}
++        </Button>
++      )}
++    </div>
++  );
++}
+diff --git a/client/src/components/Library/Organization.tsx b/client/src/components/Library/Organization.tsx
+new file mode 100644
+index 0000000..121497d
+--- /dev/null
++++ b/client/src/components/Library/Organization.tsx
+@@ -0,0 +1,133 @@
++import { Button } from '@librechat/client';
++import { libraryService } from 'librechat-data-provider';
++import type { LibraryEntry } from 'librechat-data-provider';
++import { useLibraryWrite } from './hooks';
++import { useLocalize } from '~/hooks';
++import { Failure } from './Feedback';
++
++export default function Organization({
++  entry,
++  entries,
++  onOpen,
++}: {
++  entry: LibraryEntry;
++  entries: LibraryEntry[];
++  onOpen?: (id: number) => void;
++}) {
++  const localize = useLocalize();
++  const organize = useLibraryWrite('organize', libraryService.organize);
++  const value = entry.organization;
++  const state = value?.state ?? 'not_started';
++  const pending = ['pending', 'running'].includes(state);
++  const ready = state === 'ready';
++  const states = {
++    blocked: 'com_ui_library_organization_blocked',
++    failed: 'com_ui_library_organization_failed',
++    stale: 'com_ui_library_organization_stale',
++  } as const;
++  const stateLabel = pending
++    ? 'com_ui_library_organization_pending'
++    : (states[state as keyof typeof states] ?? 'com_ui_library_organization_not_started');
++  const labels = {
++    similar: 'com_ui_library_relation_similar',
++    complements: 'com_ui_library_relation_complements',
++    contradicts: 'com_ui_library_relation_contradicts',
++  } as const;
++  return (
++    <section
++      className="space-y-3 rounded-lg border border-border-light p-3"
++      aria-label={localize('com_ui_library_organization')}
++    >
++      <h4 className="text-sm font-semibold">{localize('com_ui_library_organization')}</h4>
++      <p className="text-xs text-text-secondary">{localize('com_ui_library_organization_hint')}</p>
++      {!ready && (
++        <p role="status" className="text-sm text-text-secondary">
++          {localize(stateLabel)}
++        </p>
++      )}
++      {value?.summary && (
++        <>
++          {!ready && (
++            <p className="text-xs text-text-secondary">
++              {localize('com_ui_library_organization_previous')}
++            </p>
++          )}
++          {value.title && <h5 className="break-words text-sm font-semibold">{value.title}</h5>}
++          <p className="whitespace-pre-wrap break-words text-sm">{value.summary}</p>
++          {!!value.topics?.length && (
++            <p className="break-words text-xs text-text-secondary">{value.topics.join(' · ')}</p>
++          )}
++          <ul className="space-y-3">
++            {value.key_points?.map((point, index) => (
++              <li key={index} className="text-sm">
++                <p className="break-words">{point.text}</p>
++                <details className="mt-1 text-text-secondary">
++                  <summary className="cursor-pointer text-xs">
++                    {localize('com_ui_library_point_evidence')}
++                  </summary>
++                  <blockquote className="mt-2 whitespace-pre-wrap break-words border-l-2 border-border-light pl-3">
++                    {point.quote}
++                  </blockquote>
++                </details>
++              </li>
++            ))}
++          </ul>
++          {!!value.relations?.length && (
++            <div className="space-y-3 border-t border-border-light pt-3">
++              <h5 className="text-sm font-medium">{localize('com_ui_library_related_sources')}</h5>
++              {value.relations.map((relation) => {
++                const target = entries.find((item) => item.id === relation.entry_id);
++                return (
++                  <div key={relation.entry_id} className="space-y-1 text-sm">
++                    <p className="font-medium">{localize(labels[relation.kind])}</p>
++                    {onOpen ? (
++                      <button
++                        type="button"
++                        onClick={() => onOpen(relation.entry_id)}
++                        className="break-words text-left underline underline-offset-2"
++                      >
++                        {target?.organization?.title || target?.title || String(relation.entry_id)}
++                      </button>
++                    ) : (
++                      <p>{target?.title || String(relation.entry_id)}</p>
++                    )}
++                    <p className="break-words">{relation.explanation}</p>
++                    <details className="text-text-secondary">
++                      <summary className="cursor-pointer text-xs">
++                        {localize('com_ui_library_relation_evidence')}
++                      </summary>
++                      <blockquote className="mt-2 whitespace-pre-wrap break-words border-l-2 border-border-light pl-3">
++                        {relation.quote}
++                      </blockquote>
++                      <blockquote className="mt-2 whitespace-pre-wrap break-words border-l-2 border-border-light pl-3">
++                        {relation.related_quote}
++                      </blockquote>
++                    </details>
++                  </div>
++                );
++              })}
++            </div>
++          )}
++          {value.limitations && (
++            <p className="break-words text-xs text-text-secondary">{value.limitations}</p>
++          )}
++        </>
++      )}
++      {!entry.removed && !pending && (
++        <Button
++          size="sm"
++          variant="outline"
++          disabled={organize.isLoading}
++          onClick={() => organize.mutate(entry.id)}
++        >
++          {localize(
++            state === 'failed' || value?.summary
++              ? 'com_ui_library_organize_retry'
++              : 'com_ui_library_organize_now',
++          )}
++        </Button>
++      )}
++      {organize.isError && <Failure error={organize.error} />}
++    </section>
++  );
++}
+diff --git a/client/src/components/Library/SourceEditor.tsx b/client/src/components/Library/SourceEditor.tsx
+new file mode 100644
+index 0000000..d7a1b70
+--- /dev/null
++++ b/client/src/components/Library/SourceEditor.tsx
+@@ -0,0 +1,152 @@
++import { useId, useState } from 'react';
++import { Button, Input, Label, Textarea } from '@librechat/client';
++import { libraryService } from 'librechat-data-provider';
++import type { LibraryEntry, LibrarySourceInput } from 'librechat-data-provider';
++import { useOperationKey, useLibraryWrite } from './hooks';
++import { useLocalize } from '~/hooks';
++import { Failure } from './Feedback';
++
++function readFile(file: File): Promise<LibrarySourceInput['assets'][number]> {
++  return new Promise((resolve, reject) => {
++    const reader = new FileReader();
++    reader.onerror = () => reject(new Error('file_read_failed'));
++    reader.onload = () => {
++      const extensions: Record<string, string> = {
++        png: 'image/png',
++        jpg: 'image/jpeg',
++        jpeg: 'image/jpeg',
++        webp: 'image/webp',
++        txt: 'text/plain',
++        md: 'text/markdown',
++      };
++      const mime = Object.values(extensions).includes(file.type)
++        ? file.type
++        : extensions[file.name.split('.').pop()?.toLowerCase() ?? ''];
++      if (!mime) {
++        reject(new Error('unsupported_file'));
++        return;
++      }
++      resolve({ name: file.name, mime, data: String(reader.result).split(',')[1] });
++    };
++    reader.readAsDataURL(file);
++  });
++}
++
++export default function SourceEditor({
++  onSaved,
++  onCancel,
++}: {
++  onSaved: (entry: LibraryEntry) => void;
++  onCancel: () => void;
++}) {
++  const localize = useLocalize();
++  const id = useId();
++  const operationKey = useOperationKey();
++  const [title, setTitle] = useState('');
++  const [text, setText] = useState('');
++  const [url, setUrl] = useState('');
++  const [files, setFiles] = useState<File[]>([]);
++  const [reading, setReading] = useState(false);
++  const [readFailed, setReadFailed] = useState(false);
++  const save = useLibraryWrite('source', libraryService.addSource, onSaved);
++  const tooLarge =
++    files.length > 4 || files.reduce((sum, file) => sum + file.size, 0) > 2 * 1024 * 1024;
++  const busy = reading || save.isLoading;
++  const canSave = !busy && !tooLarge && !!(text.trim() || url.trim() || files.length);
++  return (
++    <form
++      className="space-y-4"
++      onSubmit={async (event) => {
++        event.preventDefault();
++        if (!canSave) {
++          return;
++        }
++        setReading(true);
++        setReadFailed(false);
++        try {
++          const assets = await Promise.all(files.map(readFile));
++          save.mutate({
++            text: text.trim(),
++            title: title.trim(),
++            url: url.trim(),
++            assets,
++            operation_key: operationKey,
++          });
++        } catch {
++          setReadFailed(true);
++        } finally {
++          setReading(false);
++        }
++      }}
++    >
++      <h3 className="font-semibold">{localize('com_ui_library_add_source')}</h3>
++      <p className="text-sm text-text-secondary">{localize('com_ui_library_source_add_hint')}</p>
++      <div className="space-y-2">
++        <Label htmlFor={`${id}-title`}>{localize('com_ui_library_source_title')}</Label>
++        <Input
++          id={`${id}-title`}
++          value={title}
++          maxLength={200}
++          disabled={busy}
++          onChange={(event) => setTitle(event.target.value)}
++        />
++      </div>
++      <div className="space-y-2">
++        <Label htmlFor={`${id}-text`}>{localize('com_ui_library_source_text')}</Label>
++        <Textarea
++          id={`${id}-text`}
++          rows={6}
++          value={text}
++          maxLength={20000}
++          disabled={busy}
++          onChange={(event) => setText(event.target.value)}
++        />
++      </div>
++      <div className="space-y-2">
++        <Label htmlFor={`${id}-url`}>{localize('com_ui_library_source_url')}</Label>
++        <Input
++          id={`${id}-url`}
++          type="url"
++          value={url}
++          maxLength={2000}
++          disabled={busy}
++          onChange={(event) => setUrl(event.target.value)}
++        />
++      </div>
++      <div className="space-y-2">
++        <Label htmlFor={`${id}-files`}>{localize('com_ui_library_source_files')}</Label>
++        <input
++          id={`${id}-files`}
++          type="file"
++          multiple
++          disabled={busy}
++          accept=".png,.jpg,.jpeg,.webp,.txt,.md,image/png,image/jpeg,image/webp,text/plain,text/markdown"
++          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
++          className="block w-full min-w-0 text-sm"
++        />
++        <p className="text-xs text-text-secondary">
++          {localize('com_ui_library_source_files_hint')}
++        </p>
++      </div>
++      {tooLarge && (
++        <p role="alert" className="text-sm">
++          {localize('com_ui_library_source_files_limit')}
++        </p>
++      )}
++      {readFailed && (
++        <p role="alert" className="text-sm">
++          {localize('com_ui_library_source_read_failed')}
++        </p>
++      )}
++      {save.isError && <Failure error={save.error} />}
++      <div className="flex flex-wrap justify-end gap-2">
++        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
++          {localize('com_ui_cancel')}
++        </Button>
++        <Button type="submit" disabled={!canSave}>
++          {localize(busy ? 'com_ui_library_saving' : 'com_ui_library_save_organize')}
++        </Button>
++      </div>
++    </form>
++  );
++}
+diff --git a/client/src/components/Library/Turn.tsx b/client/src/components/Library/Turn.tsx
+new file mode 100644
+index 0000000..b0b967e
+--- /dev/null
++++ b/client/src/components/Library/Turn.tsx
+@@ -0,0 +1,228 @@
++import { useEffect, useId, useRef, useState } from 'react';
++import { useQuery } from '@tanstack/react-query';
++import { Button, Label, Textarea } from '@librechat/client';
++import { libraryService, QueryKeys } from 'librechat-data-provider';
++import type { LibraryDraft } from 'librechat-data-provider';
++import { useLibraryConversation, useLibraryWrite, useOperationKey } from './hooks';
++import { useAuthContext } from '~/hooks/AuthContext';
++import { Failure, Loading } from './Feedback';
++import { useKindLabel } from './Entry';
++import { useLocalize } from '~/hooks';
++import LibraryDialog from './Dialog';
++
++function Draft({ draft }: { draft: LibraryDraft }) {
++  const localize = useLocalize();
++  const kindLabel = useKindLabel();
++  const id = useId();
++  const operationKey = useOperationKey();
++  const [text, setText] = useState(draft.payload.text);
++  const confirm = useLibraryWrite('confirmDraft', () =>
++    libraryService.confirmDraft(draft.id, {
++      text: text.trim(),
++      confirmed: true,
++      operation_key: operationKey,
++    }),
++  );
++  const dismiss = useLibraryWrite('dismissDraft', () => libraryService.dismissDraft(draft.id));
++  if (draft.status !== 'pending' || confirm.isSuccess || dismiss.isSuccess) {
++    return (
++      <p role="status" className="text-sm text-text-secondary">
++        {localize(
++          draft.status === 'saved' || confirm.isSuccess
++            ? 'com_ui_library_draft_saved'
++            : 'com_ui_library_draft_dismissed',
++        )}
++      </p>
++    );
++  }
++  const busy = confirm.isLoading || dismiss.isLoading;
++  return (
++    <form
++      className="space-y-3 border-t border-border-light pt-3"
++      onSubmit={(event) => {
++        event.preventDefault();
++        if (text.trim() && !busy) {
++          confirm.mutate();
++        }
++      }}
++    >
++      <Label htmlFor={`${id}-draft`}>
++        {localize('com_ui_library_draft_label', { kind: kindLabel(draft.payload.kind) })}
++      </Label>
++      <p className="text-sm text-text-secondary">
++        {localize(
++          draft.payload.entry_id
++            ? 'com_ui_library_revision_draft_hint'
++            : 'com_ui_library_draft_hint',
++        )}
++      </p>
++      <Textarea
++        id={`${id}-draft`}
++        value={text}
++        onChange={(event) => setText(event.target.value)}
++        rows={3}
++        required
++        disabled={busy}
++      />
++      {draft.payload.reason && (
++        <p className="whitespace-pre-wrap break-words text-sm text-text-secondary">
++          {draft.payload.reason}
++        </p>
++      )}
++      <div className="flex flex-wrap gap-2">
++        <Button type="submit" size="sm" disabled={busy || !text.trim()}>
++          {localize(confirm.isLoading ? 'com_ui_library_saving' : 'com_ui_library_confirm_save')}
++        </Button>
++        <Button
++          type="button"
++          size="sm"
++          variant="outline"
++          disabled={busy}
++          onClick={() => dismiss.mutate()}
++        >
++          {localize('com_ui_library_dismiss')}
++        </Button>
++      </div>
++      {confirm.isError && <Failure error={confirm.error} />}
++      {dismiss.isError && <Failure error={dismiss.error} />}
++    </form>
++  );
++}
++
++export default function Turn({
++  conversationId,
++  messageId,
++  isSubmitting,
++}: {
++  conversationId: string;
++  messageId: string;
++  isSubmitting: boolean;
++}) {
++  const localize = useLocalize();
++  const kindLabel = useKindLabel();
++  const { user, isAuthenticated } = useAuthContext();
++  const [detailId, setDetailId] = useState<number>();
++  const [expanded, setExpanded] = useState(false);
++  const wasSubmitting = useRef(isSubmitting);
++  const turn = useQuery(
++    [QueryKeys.libraryTurn, user?.id, conversationId, messageId],
++    () => libraryService.turn(conversationId, messageId),
++    {
++      enabled: isAuthenticated && !isSubmitting,
++      staleTime: 30000,
++      retry: false,
++      refetchOnWindowFocus: false,
++    },
++  );
++  const conversation = useLibraryConversation(expanded ? conversationId : undefined);
++  const update = useLibraryWrite('exclude', libraryService.updateConversation);
++  const { refetch } = turn;
++  useEffect(() => {
++    if (wasSubmitting.current && !isSubmitting && isAuthenticated) {
++      void refetch();
++    }
++    wasSubmitting.current = isSubmitting;
++  }, [isSubmitting, isAuthenticated, refetch]);
++  if (isSubmitting) {
++    return null;
++  }
++  if (turn.isLoading) {
++    return null;
++  }
++  if (turn.isError) {
++    return (
++      <details className="mt-3 text-sm text-text-secondary">
++        <summary className="cursor-pointer">{localize('com_ui_library_turn_unavailable')}</summary>
++        <Failure
++          error={turn.error instanceof Error ? turn.error : undefined}
++          retry={() => void turn.refetch()}
++        />
++      </details>
++    );
++  }
++  const data = turn.data;
++  if (!data || (!data.notice && !data.references.length && !data.drafts.length)) {
++    return null;
++  }
++  return (
++    <aside className="mt-3 space-y-3 text-sm">
++      {data.notice && (
++        <p role="status" className="text-text-secondary">
++          {data.notice}
++        </p>
++      )}
++      {data.references.length > 0 && (
++        <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
++          <summary className="cursor-pointer text-text-secondary">
++            {localize('com_ui_library_references', { count: data.references.length })}
++          </summary>
++          <ul className="mt-3 space-y-4">
++            {data.references.map((reference) => {
++              const excluded = conversation.data?.excluded_ids.includes(reference.id);
++              return (
++                <li
++                  key={`${reference.id}-${reference.version ?? reference.revision}`}
++                  className="space-y-2"
++                >
++                  <p className="break-words font-medium">
++                    {reference.label} · {kindLabel(reference.kind)} · {reference.title}
++                    {reference.version != null && (
++                      <> · {localize('com_ui_library_version', { version: reference.version })}</>
++                    )}
++                  </p>
++                  {reference.kind === 'source' && (
++                    <p className="text-text-secondary">{localize('com_ui_library_source_hint')}</p>
++                  )}
++                  <p className="whitespace-pre-wrap break-words text-text-secondary">
++                    {reference.excerpt}
++                  </p>
++                  <div className="flex flex-wrap gap-2">
++                    <Button size="sm" variant="outline" onClick={() => setDetailId(reference.id)}>
++                      {localize('com_ui_library_view')}
++                    </Button>
++                    <Button
++                      size="sm"
++                      variant="outline"
++                      disabled={!conversation.data || update.isLoading || excluded}
++                      onClick={() => {
++                        if (conversation.data) {
++                          update.mutate({
++                            conversation_id: conversationId,
++                            excluded_ids: [...conversation.data.excluded_ids, reference.id],
++                            selected_ids: conversation.data.selected_ids.filter(
++                              (id) => id !== reference.id,
++                            ),
++                          });
++                        }
++                      }}
++                    >
++                      {localize(
++                        excluded ? 'com_ui_library_reference_excluded' : 'com_ui_library_exclude',
++                      )}
++                    </Button>
++                  </div>
++                </li>
++              );
++            })}
++          </ul>
++          {conversation.isLoading && <Loading />}
++          {conversation.isError && <Failure retry={() => void conversation.refetch()} />}
++          {update.isError && <Failure error={update.error} />}
++        </details>
++      )}
++      {data.drafts.map((draft) => (
++        <Draft key={draft.id} draft={draft} />
++      ))}
++      <LibraryDialog
++        open={detailId != null}
++        onOpenChange={(open) => {
++          if (!open) {
++            setDetailId(undefined);
++          }
++        }}
++        conversationId={conversationId}
++        initialId={detailId}
++      />
++    </aside>
++  );
++}
+diff --git a/client/src/components/Library/__tests__/Library.spec.tsx b/client/src/components/Library/__tests__/Library.spec.tsx
+new file mode 100644
+index 0000000..031f64b
+--- /dev/null
++++ b/client/src/components/Library/__tests__/Library.spec.tsx
+@@ -0,0 +1,483 @@
++import React from 'react';
++import { MemoryRouter } from 'react-router-dom';
++import { libraryService } from 'librechat-data-provider';
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
++import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
++import type { LibraryEntry, TMessage } from 'librechat-data-provider';
++import Controls from '../Controls';
++import Collect from '../Collect';
++import Editor from '../Editor';
++import Entry from '../Entry';
++import Turn from '../Turn';
++import SourceEditor from '../SourceEditor';
++import Organization from '../Organization';
++import LibraryDialog from '../Dialog';
++
++jest.mock('~/hooks', () => ({ useLocalize: () => (key: string) => key }));
++jest.mock('~/data-provider', () => ({
++  useGetStartupConfig: () => ({ data: { interface: { library: true } } }),
++}));
++jest.mock('~/hooks/AuthContext', () => ({
++  useAuthContext: () => ({ user: { id: 'owner' }, isAuthenticated: true }),
++}));
++jest.mock('@librechat/client', () => {
++  const React = jest.requireActual('react');
++  return {
++    Button: ({
++      children,
++      size: _size,
++      variant: _variant,
++      ...props
++    }: React.ButtonHTMLAttributes<HTMLButtonElement> & { size?: string; variant?: string }) => (
++      <button {...props}>{children}</button>
++    ),
++    Input: React.forwardRef(
++      (props: React.InputHTMLAttributes<HTMLInputElement>, ref: React.Ref<HTMLInputElement>) => (
++        <input {...props} ref={ref} />
++      ),
++    ),
++    Textarea: React.forwardRef(
++      (
++        props: React.TextareaHTMLAttributes<HTMLTextAreaElement>,
++        ref: React.Ref<HTMLTextAreaElement>,
++      ) => <textarea {...props} ref={ref} />,
++    ),
++    Label: (props: React.LabelHTMLAttributes<HTMLLabelElement>) => <label {...props} />,
++    Spinner: () => <span />,
++    OGDialog: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
++      open ? <div>{children}</div> : null,
++    OGDialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
++    OGDialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
++    OGDialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
++  };
++});
++jest.mock('librechat-data-provider', () => ({
++  QueryKeys: {
++    libraryEntries: 'libraryEntries',
++    libraryEntry: 'libraryEntry',
++    libraryTurn: 'libraryTurn',
++    libraryConversation: 'libraryConversation',
++  },
++  MutationKeys: { libraryWrite: 'libraryWrite', libraryDownload: 'libraryDownload' },
++  LibraryRequestError: class LibraryRequestError extends Error {},
++  libraryService: {
++    list: jest.fn(),
++    entry: jest.fn(),
++    collect: jest.fn(),
++    addSource: jest.fn(),
++    organize: jest.fn(),
++    principle: jest.fn(),
++    experience: jest.fn(),
++    remove: jest.fn(),
++    retry: jest.fn(),
++    turn: jest.fn(),
++    conversation: jest.fn(),
++    updateConversation: jest.fn(),
++    confirmDraft: jest.fn(),
++    dismissDraft: jest.fn(),
++    export: jest.fn(),
++    asset: jest.fn(),
++  },
++}));
++
++const service = jest.mocked(libraryService);
++const base: LibraryEntry = {
++  id: 1,
++  kind: 'principle',
++  title: '先看事实',
++  text: '先看事实再下结论',
++  revision: 2,
++  removed: false,
++  parse_state: 'ready',
++  index_state: 'ready',
++  assets: [],
++  versions: [],
++  source_ids: [],
++  experience_ids: [],
++  version: 2,
++};
++const source: LibraryEntry = { ...base, id: 2, kind: 'source', title: '独处摘录' };
++function Wrapper({ children }: { children: React.ReactNode }) {
++  const [client] = React.useState(
++    () =>
++      new QueryClient({
++        defaultOptions: { queries: { retry: false, cacheTime: 0 }, mutations: { retry: false } },
++        logger: { log: console.log, warn: console.warn, error: () => undefined },
++      }),
++  );
++  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
++}
++
++beforeEach(() => {
++  jest.clearAllMocks();
++  Object.defineProperty(global.crypto, 'randomUUID', {
++    configurable: true,
++    value: () => 'stable-operation-key',
++  });
++  service.list.mockResolvedValue({ entries: [base, source] });
++  service.entry.mockResolvedValue(base);
++  service.collect.mockResolvedValue(source);
++  service.principle.mockResolvedValue({ ...base, revision: 3, version: 3 });
++  service.conversation.mockResolvedValue({
++    selected_ids: [],
++    excluded_ids: [],
++    proposals_enabled: true,
++  });
++  service.turn.mockResolvedValue({ references: [], notice: '', completed: true, drafts: [] });
++  service.confirmDraft.mockResolvedValue(base);
++  service.dismissDraft.mockResolvedValue({ status: 'dismissed' });
++  service.remove.mockResolvedValue({ ...base, removed: true, revision: 3 });
++});
++
++test('collect uses server message identity and waits for a success receipt', async () => {
++  render(<Collect conversationId="chat1" messageId="user1" />, { wrapper: Wrapper });
++  expect(service.collect).not.toHaveBeenCalled();
++  fireEvent.click(screen.getByText('com_ui_library_collect'));
++  await screen.findByText('com_ui_library_collected');
++  expect(service.collect).toHaveBeenCalledWith({
++    conversation_id: 'chat1',
++    message_id: 'user1',
++    operation_key: 'stable-operation-key',
++  });
++});
++
++test('a source can be added directly and does not create a principle', async () => {
++  const saved = jest.fn();
++  service.addSource.mockResolvedValue(source);
++  render(<SourceEditor onSaved={saved} onCancel={jest.fn()} />, { wrapper: Wrapper });
++  expect(screen.getByText('com_ui_library_save_organize')).toBeDisabled();
++  fireEvent.change(screen.getByLabelText('com_ui_library_source_text'), {
++    target: { value: '原文：独处让我恢复精力。' },
++  });
++  fireEvent.click(screen.getByText('com_ui_library_save_organize'));
++  await waitFor(() => expect(saved).toHaveBeenCalledWith(source));
++  expect(service.addSource).toHaveBeenCalledWith(
++    expect.objectContaining({
++      text: '原文：独处让我恢复精力。',
++      operation_key: 'stable-operation-key',
++      assets: [],
++    }),
++  );
++  expect(service.principle).not.toHaveBeenCalled();
++});
++
++test('image attachments with missing browser MIME are identified by extension', async () => {
++  service.addSource.mockResolvedValue(source);
++  render(<SourceEditor onSaved={jest.fn()} onCancel={jest.fn()} />, { wrapper: Wrapper });
++  fireEvent.change(screen.getByLabelText('com_ui_library_source_files'), {
++    target: { files: [new File(['synthetic fixture bytes'], 'fixture.PNG', { type: '' })] },
++  });
++  fireEvent.click(screen.getByText('com_ui_library_save_organize'));
++  await waitFor(() =>
++    expect(service.addSource).toHaveBeenCalledWith(
++      expect.objectContaining({
++        assets: [expect.objectContaining({ name: 'fixture.PNG', mime: 'image/png' })],
++      }),
++    ),
++  );
++});
++
++test('organization shows evidence and failed retry retains the previous result', async () => {
++  const item: LibraryEntry = {
++    ...source,
++    organization: {
++      state: 'failed',
++      summary: '材料讨论独处的价值',
++      topics: ['独处'],
++      key_points: [{ text: '独处有助恢复', quote: '独处让我恢复精力。' }],
++      relations: [],
++      error_code: 'generation_failed',
++    },
++  };
++  service.organize.mockResolvedValue({
++    ...item,
++    organization: { ...item.organization!, state: 'pending' },
++  });
++  render(<Organization entry={item} entries={[item]} />, { wrapper: Wrapper });
++  expect(screen.getByText('材料讨论独处的价值')).toBeInTheDocument();
++  expect(screen.getByText('独处让我恢复精力。')).toBeInTheDocument();
++  expect(screen.getByText('com_ui_library_organization_previous')).toBeInTheDocument();
++  fireEvent.click(screen.getByText('com_ui_library_organize_retry'));
++  await waitFor(() => expect(service.organize).toHaveBeenCalledWith(source.id));
++});
++
++test('source themes filter the material list without changing the records', async () => {
++  service.list.mockResolvedValue({
++    entries: [
++      { ...source, title: '独处材料', organization: { state: 'ready', topics: ['精力管理'] } },
++      { ...source, id: 3, title: '学习材料', organization: { state: 'ready', topics: ['学习'] } },
++    ],
++  });
++  render(<LibraryDialog open onOpenChange={jest.fn()} />, { wrapper: Wrapper });
++  fireEvent.click(await screen.findByRole('button', { name: 'com_ui_library_source' }));
++  fireEvent.change(screen.getByLabelText('com_ui_library_topic_filter'), {
++    target: { value: '精力管理' },
++  });
++  expect(screen.getByText('独处材料')).toBeInTheDocument();
++  expect(screen.queryByText('学习材料')).not.toBeInTheDocument();
++  expect(service.addSource).not.toHaveBeenCalled();
++});
++
++test('principle edit requires a reason and selects source titles while saving stable IDs', async () => {
++  render(
++    <Editor
++      kind="principle"
++      entry={base}
++      entries={[source]}
++      onSaved={jest.fn()}
++      onCancel={jest.fn()}
++    />,
++    { wrapper: Wrapper },
++  );
++  expect(screen.getByText('com_ui_library_confirm_save')).toBeDisabled();
++  fireEvent.change(screen.getByLabelText('com_ui_library_statement'), {
++    target: { value: '先确认事实，也保留反例' },
++  });
++  fireEvent.change(screen.getByLabelText('com_ui_library_revision_reason'), {
++    target: { value: '补充边界' },
++  });
++  fireEvent.click(screen.getByLabelText('独处摘录'));
++  fireEvent.click(screen.getByText('com_ui_library_confirm_save'));
++  await waitFor(() =>
++    expect(service.principle).toHaveBeenCalledWith(
++      expect.objectContaining({
++        entry_id: 1,
++        expected_revision: 2,
++        statement: '先确认事实，也保留反例',
++        reason: '补充边界',
++        source_ids: [2],
++        confirmed: true,
++      }),
++    ),
++  );
++});
++
++test('remove requires an exact title and sends the displayed revision', async () => {
++  render(
++    <Entry
++      entryId={1}
++      entries={[base]}
++      conversationBusy={false}
++      onConversationChange={jest.fn()}
++      onEdit={jest.fn()}
++    />,
++    { wrapper: Wrapper },
++  );
++  fireEvent.click(await screen.findByText('com_ui_library_remove'));
++  const confirm = screen.getByText('com_ui_library_confirm_remove');
++  fireEvent.change(screen.getByLabelText('com_ui_library_remove_confirm'), {
++    target: { value: '先看' },
++  });
++  expect(confirm).toBeDisabled();
++  expect(service.remove).not.toHaveBeenCalled();
++  fireEvent.change(screen.getByLabelText('com_ui_library_remove_confirm'), {
++    target: { value: base.title },
++  });
++  fireEvent.click(confirm);
++  await waitFor(() =>
++    expect(service.remove).toHaveBeenCalledWith(1, {
++      removed: true,
++      expected_revision: 2,
++      confirmed: true,
++    }),
++  );
++});
++
++test('five selections disable selecting another record but allow exclusion', async () => {
++  render(
++    <Entry
++      entryId={1}
++      entries={[base]}
++      conversation={{
++        selected_ids: [10, 11, 12, 13, 14],
++        excluded_ids: [],
++        proposals_enabled: true,
++      }}
++      conversationBusy={false}
++      onConversationChange={jest.fn()}
++      onEdit={jest.fn()}
++    />,
++    { wrapper: Wrapper },
++  );
++  expect(await screen.findByLabelText('com_ui_library_select_conversation')).toBeDisabled();
++  expect(screen.getByLabelText('com_ui_library_exclude_conversation')).toBeEnabled();
++});
++
++test('an untitled numeric entry can be removed by typing its displayed ID', async () => {
++  service.entry.mockResolvedValue({ ...base, id: 42, title: '' });
++  render(
++    <Entry
++      entryId={42}
++      entries={[]}
++      conversationBusy={false}
++      onConversationChange={jest.fn()}
++      onEdit={jest.fn()}
++    />,
++    { wrapper: Wrapper },
++  );
++  fireEvent.click(await screen.findByText('com_ui_library_remove'));
++  fireEvent.change(screen.getByLabelText('com_ui_library_remove_confirm'), {
++    target: { value: '42' },
++  });
++  const confirm = screen.getByText('com_ui_library_confirm_remove');
++  expect(confirm).toBeEnabled();
++  fireEvent.click(confirm);
++  await waitFor(() =>
++    expect(service.remove).toHaveBeenCalledWith(42, {
++      removed: true,
++      expected_revision: 2,
++      confirmed: true,
++    }),
++  );
++});
++
++test('historical versions display their own association snapshots after current associations change', async () => {
++  const newerSource = { ...source, id: 4, title: '新依据标题' };
++  service.entry.mockResolvedValue({
++    ...base,
++    source_ids: [4],
++    versions: [
++      {
++        version: 1,
++        title: '旧版原则标题',
++        text: '旧版原则表述',
++        status: 'adopted',
++        reason: '当时理由',
++        created_at: '2026-10-15',
++        when_to_use: '旧适用情境',
++        boundaries: '旧边界',
++        source_ids: [2],
++        experience_ids: [],
++        evidence: [{ id: 2, kind: 'source', revision: 1, excerpt: '旧版确认时保存的依据摘录' }],
++      },
++    ],
++  });
++  render(
++    <Entry
++      entryId={1}
++      entries={[source, newerSource]}
++      conversationBusy={false}
++      onConversationChange={jest.fn()}
++      onEdit={jest.fn()}
++    />,
++    { wrapper: Wrapper },
++  );
++  expect(await screen.findByText('新依据标题')).toBeInTheDocument();
++  expect(screen.getByText('旧版原则标题')).toBeInTheDocument();
++  expect(screen.getByText('旧版确认时保存的依据摘录')).toBeInTheDocument();
++  expect(screen.getByText('旧适用情境')).toBeInTheDocument();
++  expect(screen.getByText('旧边界')).toBeInTheDocument();
++});
++
++test('a draft remains editable and unwritten until explicit confirmation', async () => {
++  service.turn.mockResolvedValue({
++    references: [],
++    notice: '',
++    completed: true,
++    drafts: [
++      {
++        id: 3,
++        payload: { kind: 'principle', text: '旧草稿', source_ids: [], experience_ids: [] },
++        status: 'pending',
++      },
++    ],
++  });
++  render(<Turn conversationId="chat1" messageId="user1" isSubmitting={false} />, {
++    wrapper: Wrapper,
++  });
++  const field = await screen.findByLabelText('com_ui_library_draft_label');
++  expect(service.confirmDraft).not.toHaveBeenCalled();
++  fireEvent.change(field, { target: { value: '用户编辑后的原则' } });
++  fireEvent.click(screen.getByText('com_ui_library_confirm_save'));
++  await screen.findByText('com_ui_library_draft_saved');
++  expect(service.confirmDraft).toHaveBeenCalledWith(3, {
++    text: '用户编辑后的原则',
++    confirmed: true,
++    operation_key: 'stable-operation-key',
++  });
++  expect(service.turn).toHaveBeenCalledTimes(1);
++});
++
++test('ignoring a draft never confirms it', async () => {
++  service.turn.mockResolvedValue({
++    references: [],
++    notice: '',
++    completed: true,
++    drafts: [
++      {
++        id: 3,
++        payload: { kind: 'principle', text: '草稿', source_ids: [], experience_ids: [] },
++        status: 'pending',
++      },
++    ],
++  });
++  render(<Turn conversationId="chat1" messageId="user1" isSubmitting={false} />, {
++    wrapper: Wrapper,
++  });
++  fireEvent.click(await screen.findByText('com_ui_library_dismiss'));
++  await screen.findByText('com_ui_library_draft_dismissed');
++  expect(service.dismissDraft).toHaveBeenCalledWith(3);
++  expect(service.confirmDraft).not.toHaveBeenCalled();
++});
++
++test('generation completion fetches the turn without permanent history polling', async () => {
++  const view = render(<Turn conversationId="chat1" messageId="user1" isSubmitting />, {
++    wrapper: Wrapper,
++  });
++  expect(service.turn).not.toHaveBeenCalled();
++  view.rerender(<Turn conversationId="chat1" messageId="user1" isSubmitting={false} />);
++  await waitFor(() => expect(service.turn).toHaveBeenCalledTimes(1));
++  expect(service.turn).toHaveBeenCalledWith('chat1', 'user1');
++  view.rerender(<Turn conversationId="chat1" messageId="user1" isSubmitting={false} />);
++  expect(service.turn).toHaveBeenCalledTimes(1);
++  jest.useFakeTimers();
++  await act(async () => {
++    jest.advanceTimersByTime(60000);
++  });
++  expect(service.turn).toHaveBeenCalledTimes(1);
++  jest.useRealTimers();
++});
++
++test('assistant controls fetch the assistant ID, keeping regenerated turns separate', async () => {
++  const message: TMessage = {
++    messageId: 'assistant1',
++    conversationId: 'chat1',
++    parentMessageId: 'user1',
++    isCreatedByUser: false,
++    text: '回答',
++  };
++  render(
++    <MemoryRouter initialEntries={['/c/chat1']}>
++      <Controls message={message} isSubmitting={false} />
++    </MemoryRouter>,
++    { wrapper: Wrapper },
++  );
++  await waitFor(() => expect(service.turn).toHaveBeenCalledWith('chat1', 'assistant1'));
++  expect(service.turn).not.toHaveBeenCalledWith('chat1', 'user1');
++});
++
++test('shared pages do not read the personal library', () => {
++  const message: TMessage = {
++    messageId: 'assistant1',
++    conversationId: 'chat1',
++    parentMessageId: 'user1',
++    isCreatedByUser: false,
++    text: '分享的回答',
++  };
++  render(
++    <MemoryRouter initialEntries={['/share/public']}>
++      <Controls message={message} isSubmitting={false} />
++    </MemoryRouter>,
++    { wrapper: Wrapper },
++  );
++  expect(service.turn).not.toHaveBeenCalled();
++});
++
++test('failed collection shows a retryable error and never a saved receipt', async () => {
++  service.collect.mockRejectedValue(new Error('offline'));
++  render(<Collect conversationId="chat1" messageId="user1" />, { wrapper: Wrapper });
++  fireEvent.click(screen.getByText('com_ui_library_collect'));
++  await screen.findByRole('alert');
++  expect(screen.queryByText('com_ui_library_collected')).not.toBeInTheDocument();
++  expect(screen.getByText('com_ui_library_collect')).toBeEnabled();
++});
+diff --git a/client/src/components/Library/hooks.ts b/client/src/components/Library/hooks.ts
+new file mode 100644
+index 0000000..b59b326
+--- /dev/null
++++ b/client/src/components/Library/hooks.ts
+@@ -0,0 +1,88 @@
++import { useRef } from 'react';
++import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
++import { libraryService, MutationKeys, QueryKeys } from 'librechat-data-provider';
++import type { LibraryEntry, LibraryRequestError } from 'librechat-data-provider';
++import { useAuthContext } from '~/hooks/AuthContext';
++
++export const pendingEntry = (entry: LibraryEntry) =>
++  !entry.removed &&
++  [entry.parse_state, entry.index_state, entry.organization?.state ?? ''].some((state) =>
++    ['pending', 'queued', 'processing', 'running'].includes(state),
++  );
++
++export function useLibraryEntries() {
++  const { user, isAuthenticated } = useAuthContext();
++  return useQuery([QueryKeys.libraryEntries, user?.id], libraryService.list, {
++    enabled: isAuthenticated,
++    refetchInterval: (data) => (data?.entries.some(pendingEntry) ? 3000 : false),
++    refetchIntervalInBackground: false,
++    retry: false,
++  });
++}
++
++export function useLibraryEntry(id?: number) {
++  const { user, isAuthenticated } = useAuthContext();
++  return useQuery([QueryKeys.libraryEntry, user?.id, id], () => libraryService.entry(id ?? 0), {
++    enabled: isAuthenticated && id != null,
++    refetchInterval: (data) => (data && pendingEntry(data) ? 3000 : false),
++    refetchIntervalInBackground: false,
++    retry: false,
++  });
++}
++
++export function useLibraryConversation(conversationId?: string) {
++  const { user, isAuthenticated } = useAuthContext();
++  return useQuery(
++    [QueryKeys.libraryConversation, user?.id, conversationId],
++    () => libraryService.conversation(conversationId ?? ''),
++    { enabled: isAuthenticated && !!conversationId && conversationId !== 'new', retry: false },
++  );
++}
++
++export function useLibraryWrite<TInput = void, TOutput = unknown>(
++  action: string,
++  mutationFn: (input: TInput) => Promise<TOutput>,
++  onSuccess?: (output: TOutput) => void,
++) {
++  const client = useQueryClient();
++  const { user } = useAuthContext();
++  return useMutation<TOutput, LibraryRequestError, TInput>({
++    mutationKey: [MutationKeys.libraryWrite, user?.id, action],
++    mutationFn,
++    retry: false,
++    onSuccess: (data) => {
++      for (const key of [
++        QueryKeys.libraryEntries,
++        QueryKeys.libraryEntry,
++        QueryKeys.libraryConversation,
++      ]) {
++        void client.invalidateQueries([key, user?.id]);
++      }
++      // Historical references are snapshots; a save must not reload every message in view.
++      void client.invalidateQueries({
++        queryKey: [QueryKeys.libraryTurn, user?.id],
++        refetchType: 'none',
++      });
++      onSuccess?.(data);
++    },
++  });
++}
++
++export function useOperationKey() {
++  const operationKey = useRef('');
++  if (!operationKey.current) {
++    operationKey.current = crypto.randomUUID();
++  }
++  return operationKey.current;
++}
++
++export function downloadBlob(blob: Blob, filename: string) {
++  const url = URL.createObjectURL(blob);
++  const link = document.createElement('a');
++  link.href = url;
++  link.download = filename;
++  document.body.append(link);
++  link.click();
++  link.remove();
++  setTimeout(() => URL.revokeObjectURL(url), 1000);
++}
+diff --git a/packages/api/src/library/router.spec.ts b/packages/api/src/library/router.spec.ts
+new file mode 100644
+index 0000000..3cb9cd4
+--- /dev/null
++++ b/packages/api/src/library/router.spec.ts
+@@ -0,0 +1,132 @@
++import express from 'express';
++import request from 'supertest';
++import { createLibraryRouter } from './router';
++
++describe('library authenticated proxy', () => {
++  const owner = 'a'.repeat(24);
++  const getMessages = jest.fn();
++  const getFiles = jest.fn();
++  const getLocalFileStream = jest.fn();
++  let fetchMock: jest.SpyInstance;
++  const app = express();
++  app.use(express.json({ limit: '3mb' }));
++  app.use(
++    '/api/library',
++    createLibraryRouter({
++      token: 'internal-test-token',
++      requireAuth: (req, _res, next) => {
++        req.user = { id: owner };
++        next();
++      },
++      configMiddleware: (req, _res, next) => {
++        Object.assign(req, { config: { interfaceConfig: { library: true } } });
++        next();
++      },
++      getMessages,
++      getFiles,
++      getLocalFileStream,
++    }),
++  );
++  beforeEach(() => {
++    jest.clearAllMocks();
++    fetchMock = jest.spyOn(global, 'fetch');
++    fetchMock.mockResolvedValue(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
++  });
++  afterEach(() => {
++    fetchMock.mockRestore();
++  });
++
++  it('uses authenticated ownership and a fixed internal peer', async () => {
++    await request(app)
++      .get('/api/library?owner=attacker')
++      .set('X-Library-Owner', 'attacker')
++      .expect(200);
++    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:8768/library/?');
++    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('X-Library-Owner')).toBe(owner);
++  });
++
++  it('rejects cross-origin writes before reading messages', async () => {
++    await request(app)
++      .post('/api/library/collect')
++      .set('Origin', 'https://evil.invalid')
++      .send({ conversation_id: 'chat', message_id: 'message', operation_key: 'test' })
++      .expect(403);
++    expect(getMessages).not.toHaveBeenCalled();
++  });
++
++  it('cannot collect an unowned message or browser supplied attachment', async () => {
++    getMessages.mockResolvedValue([]);
++    await request(app)
++      .post('/api/library/collect')
++      .send({
++        conversation_id: 'chat',
++        message_id: 'message',
++        operation_key: 'test',
++        assets: [{ filepath: 'C:/private.txt' }],
++      })
++      .expect(404);
++    expect(getMessages).toHaveBeenCalledWith({
++      user: owner,
++      conversationId: 'chat',
++      messageId: 'message',
++    });
++    expect(fetchMock).not.toHaveBeenCalled();
++  });
++
++  it('copies only persisted user text and fails safely on operational errors', async () => {
++    getMessages.mockResolvedValue([{ isCreatedByUser: true, text: 'owned message' }]);
++    await request(app)
++      .post('/api/library/collect')
++      .send({
++        conversation_id: 'chat',
++        message_id: 'message',
++        operation_key: 'test',
++        text: 'forged text',
++        owner: 'attacker',
++      })
++      .expect(200);
++    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).text).toBe('owned message');
++    fetchMock.mockRejectedValue(new Error('secret internal token'));
++    const result = await request(app).get('/api/library').expect(503);
++    expect(result.text).not.toContain('secret');
++  });
++
++  it('accepts a direct source without letting the client inject ownership or filesystem paths', async () => {
++    await request(app)
++      .post('/api/library/sources')
++      .send({
++        text: 'direct source',
++        title: 'title',
++        operation_key: 'test',
++        owner: 'attacker',
++        filepath: 'C:/private.txt',
++        assets: [],
++      })
++      .expect(200);
++    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
++    expect(body).toEqual({
++      text: 'direct source',
++      title: 'title',
++      operation_key: 'test',
++      assets: [],
++    });
++    expect(getMessages).not.toHaveBeenCalled();
++  });
++
++  it('bounds direct source attachments within the existing JSON body budget', async () => {
++    await request(app)
++      .post('/api/library/sources')
++      .send({
++        operation_key: 'test',
++        assets: [{ name: 'fake.png', mime: 'image/png', data: 'a'.repeat(3_000_000) }],
++      })
++      .expect(413);
++    expect(fetchMock).not.toHaveBeenCalled();
++  });
++
++  it('routes organization requests through authenticated ownership', async () => {
++    await request(app).post('/api/library/entries/3/organize').send({}).expect(200);
++    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:8768/library/entries/3/organize?');
++    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('X-Library-Owner')).toBe(owner);
++  });
++});
+diff --git a/packages/api/src/library/router.ts b/packages/api/src/library/router.ts
+new file mode 100644
+index 0000000..60309ad
+--- /dev/null
++++ b/packages/api/src/library/router.ts
+@@ -0,0 +1,234 @@
++import { Router } from 'express';
++import type { Request, RequestHandler } from 'express';
++import type { Readable } from 'node:stream';
++
++type StoredMessage = {
++  text?: string;
++  isCreatedByUser?: boolean;
++  files?: { file_id?: string }[];
++  attachments?: { file_id?: string }[];
++  content?: { type?: string; text?: string | { value?: string } }[];
++};
++type StoredFile = {
++  file_id: string;
++  filename?: string;
++  type?: string;
++  filepath?: string;
++  source?: string;
++  text?: string;
++};
++type Deps = {
++  token: string;
++  requireAuth: RequestHandler;
++  configMiddleware: RequestHandler;
++  getMessages: (query: {
++    user: string;
++    conversationId: string;
++    messageId: string;
++  }) => Promise<StoredMessage[]>;
++  getFiles: (
++    query: { user: string; file_id: { $in: string[] } },
++    sort: null,
++    select: string,
++  ) => Promise<StoredFile[]>;
++  getLocalFileStream: (req: Request, path: string) => Promise<Readable>;
++};
++
++const readable = /^\/(?:entries\/\d+|assets\/\d+|conversation|turn|export)?$/;
++const writable =
++  /^\/(?:collect|sources|principles|experiences|conversation|entries\/\d+\/(?:remove|retry|organize)|drafts\/\d+\/(?:confirm|dismiss))$/;
++
++export function createLibraryRouter(deps: Deps): Router {
++  const router = Router();
++  router.use(deps.requireAuth, deps.configMiddleware);
++  router.use(
++    async (req: Request & { config?: { interfaceConfig?: { library?: boolean } } }, res) => {
++      if (req.config?.interfaceConfig?.library !== true) {
++        res.status(404).json({ error: { code: 'not_found' } });
++        return;
++      }
++      const owner = req.user && 'id' in req.user ? req.user.id : undefined;
++      if (typeof owner !== 'string' || !/^[a-f\d]{24}$/i.test(owner) || !deps.token) {
++        res.status(401).json({ error: { code: 'unauthorized' } });
++        return;
++      }
++      const post = req.method === 'POST';
++      if ((!post && req.method !== 'GET') || !(post ? writable : readable).test(req.path)) {
++        res.status(404).json({ error: { code: 'not_found' } });
++        return;
++      }
++      if (
++        post &&
++        req.headers.origin &&
++        req.headers.origin !== `${req.protocol}://${req.get('host')}`
++      ) {
++        res.status(403).json({ error: { code: 'forbidden' } });
++        return;
++      }
++      try {
++        let body = req.body;
++        if (post && req.path === '/sources') {
++          const { text, title, url, assets, operation_key } = req.body ?? {};
++          if (
++            typeof operation_key !== 'string' ||
++            [text, title, url].some((value) => value !== undefined && typeof value !== 'string') ||
++            (assets !== undefined && (!Array.isArray(assets) || assets.length > 4))
++          ) {
++            res.status(400).json({ error: { code: 'invalid_request' } });
++            return;
++          }
++          // Stay below the app's existing 3 MB JSON parser; larger files use chat uploads.
++          let total = 0;
++          const copied = [];
++          for (const asset of assets ?? []) {
++            if (
++              !asset ||
++              typeof asset.name !== 'string' ||
++              typeof asset.mime !== 'string' ||
++              typeof asset.data !== 'string'
++            ) {
++              res.status(400).json({ error: { code: 'invalid_request' } });
++              return;
++            }
++            total += Buffer.byteLength(asset.data, 'base64');
++            if (total > 2 * 1024 * 1024) {
++              res.status(413).json({ error: { code: 'file_too_large' } });
++              return;
++            }
++            copied.push({ name: asset.name, mime: asset.mime, data: asset.data });
++          }
++          body = { text, title, url, assets: copied, operation_key };
++        }
++        if (post && req.path === '/collect') {
++          const { conversation_id, message_id, operation_key } = req.body;
++          if (
++            typeof conversation_id !== 'string' ||
++            typeof message_id !== 'string' ||
++            typeof operation_key !== 'string'
++          ) {
++            res.status(400).json({ error: { code: 'invalid_request' } });
++            return;
++          }
++          const messages = await deps.getMessages({
++            user: owner,
++            conversationId: conversation_id,
++            messageId: message_id,
++          });
++          const message = messages[0];
++          if (!message || !message.isCreatedByUser) {
++            res.status(404).json({ error: { code: 'message_not_found' } });
++            return;
++          }
++          const ids = [
++            ...new Set(
++              [...(message.files ?? []), ...(message.attachments ?? [])]
++                .map((file) => file.file_id)
++                .filter((id): id is string => typeof id === 'string'),
++            ),
++          ];
++          if (ids.length > 4) {
++            res.status(400).json({ error: { code: 'too_many_files' } });
++            return;
++          }
++          const files = ids.length
++            ? await deps.getFiles(
++                { user: owner, file_id: { $in: ids } },
++                null,
++                'file_id filename type filepath source text',
++              )
++            : [];
++          if (files.length !== ids.length) {
++            res.status(404).json({ error: { code: 'file_not_found' } });
++            return;
++          }
++          const assets: { name: string; mime: string; data: string }[] = [];
++          let total = 0;
++          for (const file of files) {
++            const mime = file.type ?? '';
++            if (
++              !['image/png', 'image/jpeg', 'image/webp', 'text/plain', 'text/markdown'].includes(
++                mime,
++              )
++            ) {
++              res.status(400).json({ error: { code: 'unsupported_file' } });
++              return;
++            }
++            let buffer: Buffer;
++            if (file.source === 'text' && typeof file.text === 'string') {
++              buffer = Buffer.from(file.text, 'utf8');
++            } else {
++              // Only this pilot's local, account-owned files; no remote URL fetch or client paths.
++              if (
++                file.source !== 'local' ||
++                !file.filepath ||
++                !new RegExp(`^/(?:images|uploads)/${owner}/`).test(file.filepath) ||
++                file.filepath.includes('..') ||
++                file.filepath.includes('\\')
++              ) {
++                res.status(400).json({ error: { code: 'unsupported_storage' } });
++                return;
++              }
++              const stream = await deps.getLocalFileStream(req, file.filepath);
++              const chunks: Buffer[] = [];
++              let size = 0;
++              for await (const chunk of stream) {
++                const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
++                size += bytes.length;
++                if (size > 10 * 1024 * 1024) {
++                  stream.destroy();
++                  res.status(413).json({ error: { code: 'file_too_large' } });
++                  return;
++                }
++                chunks.push(bytes);
++              }
++              buffer = Buffer.concat(chunks);
++            }
++            total += buffer.length;
++            if (buffer.length > 10 * 1024 * 1024 || total > 20 * 1024 * 1024) {
++              res.status(413).json({ error: { code: 'file_too_large' } });
++              return;
++            }
++            assets.push({
++              name: file.filename ?? file.file_id,
++              mime,
++              data: buffer.toString('base64'),
++            });
++          }
++          const text =
++            message.text ||
++            (message.content ?? [])
++              .map((part) => (typeof part.text === 'string' ? part.text : (part.text?.value ?? '')))
++              .join('\n');
++          body = { text, assets, conversation_id, message_id, operation_key };
++        }
++        const query = new URLSearchParams();
++        for (const key of ['conversation_id', 'message_id', 'version']) {
++          if (typeof req.query[key] === 'string') {
++            query.set(key, req.query[key]);
++          }
++        }
++        // Fixed loopback peer is intentional: this integration never accepts a user-supplied origin.
++        const response = await fetch(`http://127.0.0.1:8768/library${req.path}?${query}`, {
++          method: req.method,
++          headers: {
++            Authorization: `Bearer ${deps.token}`,
++            'X-Library-Owner': owner,
++            'Content-Type': 'application/json',
++          },
++          ...(post ? { body: JSON.stringify(body) } : {}),
++          signal: AbortSignal.timeout(30000),
++        });
++        res.setHeader('Cache-Control', 'no-store');
++        res.setHeader('Content-Type', response.headers.get('content-type') ?? 'application/json');
++        const disposition = response.headers.get('content-disposition');
++        if (disposition) {
++          res.setHeader('Content-Disposition', disposition);
++        }
++        res.status(response.status).send(Buffer.from(await response.arrayBuffer()));
++      } catch {
++        res.status(503).json({ error: { code: 'library_unavailable' } });
++      }
++    },
++  );
++  return router;
++}
+diff --git a/packages/data-provider/src/library.ts b/packages/data-provider/src/library.ts
+new file mode 100644
+index 0000000..40950e6
+--- /dev/null
++++ b/packages/data-provider/src/library.ts
+@@ -0,0 +1,162 @@
++import axios from 'axios';
++import { apiBaseUrl } from './api-endpoints';
++import request from './request';
++
++export type LibraryKind = 'source' | 'principle' | 'experience';
++export type LibraryAsset = { id: number; name: string; mime: string; size: number };
++export type LibraryOrganization = {
++  state: string;
++  title?: string;
++  summary?: string;
++  key_points?: { text: string; quote: string }[];
++  topics?: string[];
++  relations?: {
++    entry_id: number;
++    kind: 'similar' | 'complements' | 'contradicts';
++    explanation: string;
++    quote: string;
++    related_quote: string;
++  }[];
++  limitations?: string;
++  error_code?: string;
++  source_revision?: number;
++};
++export type LibrarySourceInput = {
++  text?: string;
++  title?: string;
++  url?: string;
++  assets: { name: string; mime: string; data: string }[];
++  operation_key: string;
++};
++export type LibraryVersion = {
++  version: number;
++  title: string;
++  text: string;
++  status: string;
++  reason: string;
++  when_to_use: string;
++  boundaries: string;
++  created_at: string;
++  source_ids: number[];
++  experience_ids: number[];
++  evidence: { id: number; kind: LibraryKind; revision: number; excerpt: string }[];
++};
++export type LibraryEntry = {
++  id: number;
++  kind: LibraryKind;
++  title: string;
++  text: string;
++  revision: number;
++  removed: boolean;
++  parse_state: string;
++  index_state: string;
++  error_code?: string | null;
++  assets: LibraryAsset[];
++  versions: LibraryVersion[];
++  source_ids: number[];
++  experience_ids: number[];
++  reason?: string;
++  transcript?: string;
++  version?: number;
++  organization?: LibraryOrganization;
++};
++export type LibraryReference = {
++  id: number;
++  kind: LibraryKind;
++  label: string;
++  title: string;
++  revision: number;
++  version?: number;
++  excerpt: string;
++};
++export type LibraryDraft = {
++  id: number;
++  payload: {
++    kind: LibraryKind;
++    text: string;
++    reason?: string;
++    source_ids: number[];
++    experience_ids: number[];
++    entry_id?: number;
++    expected_revision?: number;
++  };
++  status: 'pending' | 'saved' | 'dismissed';
++  entry_id?: number;
++};
++export type LibraryTurn = {
++  references: LibraryReference[];
++  notice?: string | null;
++  completed: boolean;
++  drafts: LibraryDraft[];
++};
++export type LibraryConversation = {
++  selected_ids: number[];
++  excluded_ids: number[];
++  proposals_enabled: boolean;
++};
++export type LibraryPrincipleInput = {
++  statement: string;
++  entry_id?: number;
++  expected_revision?: number;
++  reason?: string;
++  source_ids?: number[];
++  experience_ids?: number[];
++  confirmed: true;
++  operation_key: string;
++};
++
++export class LibraryRequestError extends Error {
++  constructor(public readonly status: number) {
++    super('Library request failed');
++    this.name = 'LibraryRequestError';
++  }
++}
++
++async function safely<T>(operation: () => Promise<T>): Promise<T> {
++  try {
++    return await operation();
++  } catch (error) {
++    throw new LibraryRequestError(axios.isAxiosError(error) ? (error.response?.status ?? 0) : 0);
++  }
++}
++
++const root = () => `${apiBaseUrl()}/api/library`;
++const entryPath = (id: number) => `${root()}/entries/${encodeURIComponent(id)}`;
++const post = <T>(path: string, body: object): Promise<T> => safely(() => request.post(path, body));
++
++/** Uses LibreChat's authenticated request and refresh handling for every library request. */
++export const libraryService = {
++  list: (): Promise<{ entries: LibraryEntry[] }> => safely(() => request.get(root())),
++  entry: (id: number): Promise<LibraryEntry> => safely(() => request.get(entryPath(id))),
++  collect: (body: { conversation_id: string; message_id: string; operation_key: string }) =>
++    post<LibraryEntry>(`${root()}/collect`, body),
++  addSource: (body: LibrarySourceInput) => post<LibraryEntry>(`${root()}/sources`, body),
++  organize: (id: number) => post<LibraryEntry>(`${entryPath(id)}/organize`, {}),
++  principle: (body: LibraryPrincipleInput) => post<LibraryEntry>(`${root()}/principles`, body),
++  experience: (body: { facts: string; confirmed: true; operation_key: string }) =>
++    post<LibraryEntry>(`${root()}/experiences`, body),
++  remove: (id: number, body: { removed: boolean; expected_revision: number; confirmed: true }) =>
++    post<LibraryEntry>(`${entryPath(id)}/remove`, body),
++  retry: (id: number) => post<LibraryEntry>(`${entryPath(id)}/retry`, {}),
++  turn: (conversationId: string, messageId: string): Promise<LibraryTurn> =>
++    safely(() =>
++      request.get(
++        `${root()}/turn?${new URLSearchParams({ conversation_id: conversationId, message_id: messageId })}`,
++      ),
++    ),
++  conversation: (id: string): Promise<LibraryConversation> =>
++    safely(() =>
++      request.get(`${root()}/conversation?${new URLSearchParams({ conversation_id: id })}`),
++    ),
++  updateConversation: (body: Partial<LibraryConversation> & { conversation_id: string }) =>
++    post<LibraryConversation>(`${root()}/conversation`, body),
++  confirmDraft: (id: number, body: { text: string; confirmed: true; operation_key: string }) =>
++    post<LibraryEntry>(`${root()}/drafts/${encodeURIComponent(id)}/confirm`, body),
++  dismissDraft: (id: number) =>
++    post<{ status: string }>(`${root()}/drafts/${encodeURIComponent(id)}/dismiss`, {}),
++  export: (): Promise<object> => safely(() => request.get(`${root()}/export`)),
++  asset: (id: number): Promise<Blob> =>
++    safely(() =>
++      request.get(`${root()}/assets/${encodeURIComponent(id)}`, { responseType: 'blob' }),
++    ),
++};

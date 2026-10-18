@@ -1,0 +1,24 @@
+{% extends 'workbench/base.html' %}
+{% block title %}{{ version.title }} · 原则库{% endblock %}
+{% block content %}
+  <div class="page-heading detail-heading">
+    <div><a class="back-link" href="{% url 'principle_list' %}">原则库</a><h1>{{ version.title }}</h1><div class="meta-line"><span class="principle-status status-{{ principle.status }}">{{ principle.get_status_display }}</span><span>{{ version.get_kind_display }}</span><span>修订 {{ principle.revision }}</span>{% if version.is_demo %}<span class="demo-badge">演示数据</span>{% endif %}</div></div>
+    <div class="heading-actions"><a class="button button-secondary" href="{% url 'principle_edit' principle.id %}">修订原则</a><form method="post" action="{% url 'principle_focus' principle.id %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ principle.revision }}"><input type="hidden" name="operation_key" value="{{ focus_key }}"><input type="hidden" name="focused" value="{% if principle.focused %}false{% else %}true{% endif %}"><button class="button button-quiet" type="submit">{% if principle.focused %}取消关注{% else %}关注这个原则{% endif %}</button></form></div>
+  </div>
+  <div class="detail-layout principle-layout">
+    <article class="reading-pane principle-reading">
+      <section class="principle-statement"><span class="eyebrow">当前版本 · 版本 {{ version.number }}</span><p>{{ version.statement|linebreaksbr }}</p></section>
+      <p class="principle-status-note">“已采纳”表示你目前愿意参考这条原则，不代表它是经过认证的真理。</p>
+      <div class="field-grid"><section class="detail-block"><h2>什么时候使用</h2><p>{{ version.when_to_use|default:'尚未记录'|linebreaksbr }}</p></section><section class="detail-block"><h2>成立条件</h2><p>{{ version.conditions|default:'尚未记录'|linebreaksbr }}</p></section><section class="detail-block"><h2>边界</h2><p>{{ version.boundaries|default:'尚未记录'|linebreaksbr }}</p></section><section class="detail-block"><h2>仍然要问</h2><p>{{ version.questions|default:'尚未记录'|linebreaksbr }}</p></section></div>
+      <section class="detail-block"><h2>保留理由</h2><p>{{ version.reason|default:'尚未记录'|linebreaksbr }}</p></section>
+      <section class="detail-block"><h2>关联经历</h2>{% if observations %}<ul class="link-list">{% for observation in observations %}<li><a href="{% url 'observation_detail' observation.id %}">{{ observation.get_effect_display }} · {{ observation.facts|truncatewords:18 }}</a></li>{% endfor %}</ul>{% else %}<p class="muted">还没有支持、不支持或暂不判断的经历。</p>{% endif %}</section>
+    </article>
+    <aside class="detail-aside">
+      <section class="aside-section"><h2>版本历史</h2>{% if versions %}<ol class="version-list">{% for item in versions %}<li><a href="{% url 'version_detail' item.id %}"><span>版本 {{ item.number }}</span><small>{{ item.title }}</small></a></li>{% endfor %}</ol>{% else %}<p class="muted">还没有历史版本。</p>{% endif %}</section>
+      <section class="aside-section"><h2>标签</h2><p>{{ version.tags|default:'未添加' }}</p></section>
+      <section class="aside-section"><h2>启发来源</h2>{% if version.sources.all %}<ul class="link-list">{% for source in version.sources.all %}<li><a href="{% url 'source_detail' source.id %}">{{ source.title|default:'未命名素材' }}</a></li>{% endfor %}</ul>{% else %}<p class="muted">暂无关联素材。</p>{% endif %}</section>
+      <section class="aside-section"><h2>用过它的选择</h2>{% if decisions %}<ul class="link-list">{% for decision in decisions %}<li><a href="{% url 'decision_detail' decision.id %}">{{ decision.situation }}</a></li>{% endfor %}</ul>{% else %}<p class="muted">还没有正式选择引用它。</p>{% endif %}</section>
+      <a class="delete-link" href="{% url 'delete_preview' 'principle' principle.id %}">查看删除影响</a>
+    </aside>
+  </div>
+{% endblock %}

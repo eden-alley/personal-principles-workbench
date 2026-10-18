@@ -1,0 +1,7 @@
+{% extends 'workbench/base.html' %}
+{% block title %}演示 · 个人原则工作台{% endblock %}
+{% block content %}
+  <div class="page-heading"><div><span class="eyebrow">明确虚构</span><h1>演示工作台</h1><p class="lede">下面的内容只展示界面流程，不会自动写入数据库，也不代表真实模型输出。</p></div><a class="button button-secondary" href="{% url 'home' %}">返回工作台</a></div>
+  <div class="demo-grid"><article class="demo-sheet"><span class="demo-badge">演示素材</span><h2>先写下事实，再决定怎么解释</h2><p>小林在一个临时项目里接下了额外工作，后来发现自己没有确认截止时间。</p><div class="demo-meta">虚构情境 · 仅供录入参考</div><a class="text-link" href="{% url 'case_create' %}">自己录入一件事</a></article><article class="demo-sheet"><span class="demo-badge">演示原则</span><h2>在答应之前，先确认代价</h2><p>这是一条虚构的行动策略，展示原则详情页如何呈现状态、版本与边界。</p><div class="demo-meta">候选 · 行动策略</div><a class="text-link" href="{% url 'principle_create' %}">自己录入一个想法</a></article></div>
+  <section class="demo-instructions"><h2>如何使用这页</h2><p>你可以复制上面的文字，进入新增表单后自行录入。点击链接只会打开真实录入页面，是否保存由你决定。</p></section>
+{% endblock %}

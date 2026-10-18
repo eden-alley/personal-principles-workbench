@@ -1,0 +1,60 @@
+version: 1.3.7
+cache: true
+memory:
+  disabled: true
+interface:
+  library: true
+  modelSelect: true
+  parameters: false
+  presets: false
+  bookmarks: true
+  multiConvo: false
+  mcpServers:
+    use: false
+    create: false
+    share: false
+    public: false
+  agents:
+    use: false
+    create: false
+    share: false
+    public: false
+  prompts:
+    use: false
+    create: false
+    share: false
+    public: false
+endpoints:
+  custom:
+    - name: CompatibleAPI
+      apiKey: '${LIBRECHAT_BRIDGE_TOKEN}'
+      baseURL: 'http://127.0.0.1:8768/v1'
+      headers:
+        X-Library-Owner: '{{LIBRECHAT_USER_ID}}'
+        X-Library-Conversation: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
+        X-Library-Message: '{{LIBRECHAT_BODY_MESSAGEID}}'
+        X-Library-Parent: '{{LIBRECHAT_BODY_PARENTMESSAGEID}}'
+      models:
+        default: ['configured-api-model']
+        fetch: false
+      titleConvo: false
+      summarize: false
+      modelDisplayLabel: API 模型
+      dropParams: ['temperature', 'top_p', 'frequency_penalty', 'presence_penalty']
+modelSpecs:
+  list:
+    - name: api-chat
+      label: API 模型
+      description: '使用本机配置的 API；聊天和自动整理按服务商计费'
+      default: true
+      preset:
+        endpoint: CompatibleAPI
+        model: configured-api-model
+fileConfig:
+  endpoints:
+    CompatibleAPI:
+      fileLimit: 4
+      fileSizeLimit: 10
+      totalSizeLimit: 20
+      supportedMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'text/plain', 'text/markdown']
+  serverFileSizeLimit: 20

@@ -1,0 +1,71 @@
+const {chromium}=require('playwright');
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const root='artifacts/librechat-runtime/';
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ const report={mock:false,model:'gpt-6.1-sol',effort:'high',checks:[],errors:[]};
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});
+  page.on('pageerror',e=>report.errors.push(e.message));
+  const credentials=JSON.parse(fs.readFileSync(root+'test-account.json'));
+  await page.goto('http://127.0.0.1:3081/login');
+  await page.locator('[name=email]').fill(credentials.email);
+  await page.locator('[name=password]').fill(credentials.password);
+  await page.locator('button[type=submit]').click();
+  await page.locator('#prompt-textarea').waitFor();
+  async function send(prompt,expected){
+   const old=await page.getByTestId('message-body').count();
+   await page.locator('#prompt-textarea').fill(prompt);
+   const start=Date.now();
+   await page.getByTestId('send-button').click();
+   await page.waitForFunction(n=>{const es=document.querySelectorAll('[data-testid="message-body"]');return es.length>=n+2&&es[es.length-1].innerText.trim().length>0},old,{timeout:130000});
+   const firstMs=Date.now()-start;
+   await page.getByTestId('regenerate-generation-button').last().waitFor({state:'visible',timeout:130000});
+   const answer=await page.getByTestId('message-body').last().innerText();
+   const record={prompt,answer,firstMs,totalMs:Date.now()-start,url:page.url(),pass:expected.test(answer)};
+   report.checks.push(record); console.log(JSON.stringify(record));
+   assert.ok(record.pass,'Unexpected answer');
+   return record;
+  }
+  await send('连通性测试：记住本轮临时暗号是橙子。请只回复：已收到。',/已收到/);
+  await send('上一条给你的临时暗号是什么？只回复暗号。',/橙子/);
+  const chatUrl=page.url();
+  await page.reload(); await page.locator('#prompt-textarea').waitFor();
+  assert.ok((await page.getByTestId('message-body').allTextContents()).some(x=>x==='橙子'||x==='橙子。'));
+  report.persistence=true;
+  await page.goto('http://127.0.0.1:3081/c/new');
+  await page.locator('input[type=file]').setInputFiles('artifacts/librechat-fixture.png');
+  await page.waitForTimeout(2000);
+  await send('描述图片中左边和右边的图形以及颜色。用一句话回答。',/红.*正方形.*蓝.*圆|红.*方.*蓝.*圆/);
+  await page.screenshot({path:'artifacts/librechat-image-acceptance.png'});
+  await page.goto('http://127.0.0.1:3081/c/new');
+  await page.locator('input[type=file]').setInputFiles('artifacts/librechat-fixture.txt');
+  await page.waitForTimeout(2000);
+  await send('根据附件，项目名称、内部编号和预算各是什么？',/青松.*Q7M4.*73/s);
+  await page.screenshot({path:'artifacts/librechat-file-acceptance.png'});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'artifacts/librechat-mobile.png'});
+  report.mobileOverflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
+  assert.equal(report.mobileOverflow,false);
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('http://127.0.0.1:3081/c/new');
+  await page.locator('#prompt-textarea').fill('请写一篇约两千字的虚构山林旅行故事。');
+  await page.getByTestId('send-button').click();
+  const stop=page.getByRole('button',{name:/停止|Stop/});
+  await stop.waitFor({timeout:15000});
+  await stop.click();
+  await page.waitForTimeout(4500);
+  report.stopped=true;
+  await page.goto('http://127.0.0.1:3081/c/new');
+  await send('请只回复：停止后发送成功。',/停止后发送成功/);
+  await page.getByTestId('regenerate-generation-button').last().click();
+  await page.getByRole('button',{name:/停止|Stop/}).waitFor({timeout:15000});
+  await page.getByTestId('regenerate-generation-button').last().waitFor({timeout:130000});
+  report.regenerated=(await page.getByTestId('message-body').last().innerText()).includes('停止后发送成功');
+  assert.ok(report.regenerated);
+  report.chatUrl=chatUrl;
+  report.pass=true;
+ }catch(error){report.failure=error.message;console.error(error.message);process.exitCode=1;}
+ finally{fs.writeFileSync('artifacts/librechat-acceptance.json',JSON.stringify(report,null,2));await browser.close();}
+})().catch(e=>{console.error(e.message);process.exitCode=1;});

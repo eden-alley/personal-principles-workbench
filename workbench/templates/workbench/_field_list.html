@@ -1,0 +1,11 @@
+{% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+{% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+{% if form.extra_fields %}
+  {% for field in form.main_fields %}{% include 'workbench/_field.html' %}{% endfor %}
+  <details class="optional-fields" {% if form.extra_has_errors %}open{% endif %}>
+    <summary>{{ form.extra_label }}</summary>
+    <div class="optional-fields-body">{% for field in form.extra_fields %}{% include 'workbench/_field.html' %}{% endfor %}</div>
+  </details>
+{% else %}
+  {% for field in form.visible_fields %}{% include 'workbench/_field.html' %}{% endfor %}
+{% endif %}

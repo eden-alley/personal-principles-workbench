@@ -1,0 +1,22 @@
+{% extends 'workbench/base.html' %}
+{% block title %}{{ source.title|default:'素材详情' }} · 素材库{% endblock %}
+{% block content %}
+  <div class="page-heading detail-heading"><div><a class="back-link" href="{% url 'source_list' %}">素材库</a><h1>{{ source.title|default:'未命名素材' }}</h1><div class="meta-line"><span>{{ source.get_kind_display }}</span><span>{{ source.created_at|date:'Y-m-d H:i' }}</span>{% if source.is_demo %}<span class="demo-badge">演示数据</span>{% endif %}</div></div><div class="heading-actions"><a class="button button-secondary" href="{% url 'source_edit' source.id %}">编辑素材</a><a class="button button-quiet" href="{% url 'source_list' %}">先存着</a></div></div>
+  <div class="detail-layout">
+    <article class="reading-pane">
+      {% if source.text %}<div class="source-copy">{{ source.text|linebreaksbr }}</div>{% elif source.transcript %}<div class="source-copy"><span class="eyebrow">手工校对文字</span>{{ source.transcript|linebreaksbr }}</div>{% elif source.url %}<div class="missing-copy"><strong>正文未获取</strong><p>这个链接只作为线索保存。工作台不会自动抓取网页正文。</p></div>{% elif source.image %}<div class="missing-copy"><strong>截图尚未补充文字</strong><p>原图已经保存，可以在编辑页手工补充或校对文字。</p></div>{% else %}<div class="missing-copy"><strong>正文未获取</strong><p>这份素材还没有可阅读的正文。</p></div>{% endif %}
+      {% if source.transcript and source.text %}<section class="detail-block"><h2>手工校对文字</h2><p class="preserve-lines">{{ source.transcript }}</p></section>{% endif %}
+      {% if source.image %}<figure class="source-image"><img src="{{ source.image.url }}" alt="{{ source.title|default:'素材原图' }}"><figcaption>原图保存在本机，文字可手工校对。</figcaption></figure>{% endif %}
+      {% if source.url %}<p class="source-url"><span>链接</span><a href="{{ source.url }}" rel="noreferrer">{{ source.url }}</a></p>{% endif %}
+      {% if source.attribution %}<p class="source-attribution"><span>来源说明</span>{{ source.attribution }}</p>{% endif %}
+    </article>
+    <aside class="detail-aside">
+      <section class="aside-section"><h2>来源信息</h2><dl class="meta-list"><dt>核验状态</dt><dd>{{ source.get_verification_display }}</dd><dt>标签</dt><dd>{{ source.tags|default:'未添加' }}</dd><dt>修订号</dt><dd>{{ source.revision }}</dd></dl></section>
+      <section class="aside-section aside-action"><h2>从这里继续</h2><p>有正文时可以提炼出一份建议，确认前不会写入正式原则。</p><a class="button button-secondary" href="{% url 'ai_preview' 'extract' source.id %}">提炼原则</a></section>
+      <section class="aside-section"><h2>关联的原则版本</h2>{% if linked %}<ul class="link-list">{% for version in linked %}<li><a href="{% url 'version_detail' version.id %}">{{ version.title }}</a><span>版本 {{ version.number }}</span></li>{% endfor %}</ul>{% else %}<p class="muted">还没有关联原则。</p>{% endif %}<a class="text-link" href="{% url 'source_link' source.id %}">关联已有原则</a></section>
+      {% if suggestions %}<section class="aside-section"><h2>已保存的建议草稿</h2><ul class="link-list">{% for suggestion in suggestions %}<li><a href="{% url 'suggestion_detail' suggestion.id %}">{{ suggestion.task }} · {{ suggestion.created_at|date:'Y-m-d H:i' }}</a></li>{% endfor %}</ul></section>{% endif %}
+      <p class="source-note">启发来源不代表支持证据。请在原则详情里明确记录理由。</p>
+      <a class="delete-link" href="{% url 'delete_preview' 'source' source.id %}">查看删除影响</a>
+    </aside>
+  </div>
+{% endblock %}

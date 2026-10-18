@@ -1,0 +1,8 @@
+{% extends 'workbench/base.html' %}
+{% block title %}选择与回看 · 个人原则工作台{% endblock %}
+{% block content %}
+  <div class="page-heading"><div><span class="eyebrow">确认过的行动</span><h1>选择与回看</h1><p class="lede">记录当时做了什么，也留下后来发生了什么。</p></div><a class="button button-primary" href="{% url 'case_list' %}">从情境开始</a></div>
+  <form class="search-bar" method="get"><label for="decision-search">搜索选择</label><div class="search-input"><input id="decision-search" name="q" value="{{ q|default:'' }}" placeholder="按情境、选择或理由搜索"><button type="submit">搜索</button></div></form>
+  {% if items %}<div class="decision-list">{% for decision in items %}<a class="decision-row" href="{% url 'decision_detail' decision.id %}"><span class="decision-state">{% if decision.reviewed %}已回看{% elif decision.review_date %}已安排回看{% else %}未安排回看{% endif %}</span><span class="decision-copy"><strong>{{ decision.situation }}</strong><span>{{ decision.choice|truncatewords:24 }}</span>{% if decision.is_demo %}<span class="demo-badge">源自演示建议</span>{% endif %}<small>{{ decision.created_at|date:'Y-m-d' }}{% if decision.review_date %} · 回看 {{ decision.review_date|date:'Y-m-d' }}{% endif %}</small></span><span class="row-arrow">打开</span></a>{% endfor %}</div>{% else %}<div class="empty-state empty-state-large"><h2>还没有正式选择</h2><p>聊天只是整理。确认一个选择后，它才会出现在这里。</p><a class="button button-secondary" href="{% url 'case_list' %}">查看情境</a></div>{% endif %}
+  {% include 'workbench/_pagination.html' %}
+{% endblock %}

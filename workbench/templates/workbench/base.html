@@ -1,0 +1,73 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}个人原则工作台{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'workbench/workbench.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main-content">跳到正文</a>
+  <div class="app-shell">
+    <aside class="side-nav" id="side-nav" aria-label="主导航">
+      <div class="brand-lockup">
+        <a class="brand" href="{% url 'home' %}">个人原则<br>工作台</a>
+        <span class="mode-label" data-app-mode>{{ app_mode }}</span>
+      </div>
+      <nav class="nav-groups">
+        {% if nav %}
+          <div class="nav-group">
+            <span class="nav-group-label">工作区</span>
+            {% for item in nav %}
+              <a class="nav-link {% if item.active %}is-active{% endif %}" href="{{ item.url }}">{{ item.label }}</a>
+            {% endfor %}
+          </div>
+        {% else %}
+        <div class="nav-group">
+          <span class="nav-group-label">工作区</span>
+          <a class="nav-link {% if request.resolver_match.url_name == 'home' %}is-active{% endif %}" href="{% url 'home' %}">工作台</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'case_list' or request.resolver_match.url_name == 'case_detail' %}is-active{% endif %}" href="{% url 'case_list' %}">情境对话</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'decision_list' or request.resolver_match.url_name == 'decision_detail' or request.resolver_match.url_name == 'observation_detail' %}is-active{% endif %}" href="{% url 'decision_list' %}">选择与回看</a>
+        </div>
+        <div class="nav-group">
+          <span class="nav-group-label">资料</span>
+          <a class="nav-link {% if request.resolver_match.url_name == 'source_list' or request.resolver_match.url_name == 'source_detail' %}is-active{% endif %}" href="{% url 'source_list' %}">素材库</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'principle_list' or request.resolver_match.url_name == 'principle_detail' or request.resolver_match.url_name == 'version_detail' %}is-active{% endif %}" href="{% url 'principle_list' %}">原则库</a>
+        </div>
+        {% endif %}
+      </nav>
+      <div class="side-footer">
+        <a class="nav-link {% if request.resolver_match.url_name == 'settings' %}is-active{% endif %}" href="{% url 'settings' %}">设置与导出</a>
+        <span class="local-note">资料保存在本机</span>
+      </div>
+    </aside>
+
+    <div class="main-column">
+      <header class="mobile-header">
+        <a class="mobile-brand" href="{% url 'home' %}">原则工作台</a>
+        <button class="menu-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="side-nav">导航</button>
+      </header>
+      <main id="main-content" class="main-content">
+        {% if messages %}
+          <div class="message-stack" aria-live="polite">
+            {% for message in messages %}
+              <div class="flash flash-{{ message.tags|default:'info' }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+      <footer class="site-footer">
+        <span>个人原则工作台</span>
+        <span>本机使用 · 版本可追溯</span>
+      </footer>
+    </div>
+  </div>
+  <div class="nav-scrim" data-nav-close></div>
+  <script src="{% static 'workbench/workbench.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

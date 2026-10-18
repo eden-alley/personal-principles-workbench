@@ -1,0 +1,62 @@
+version: 1.3.7
+cache: true
+memory:
+  disabled: true
+interface:
+  library: true
+  modelSelect: true
+  parameters: false
+  presets: false
+  bookmarks: true
+  multiConvo: false
+  mcpServers:
+    use: false
+    create: false
+    share: false
+    public: false
+  agents:
+    use: false
+    create: false
+    share: false
+    public: false
+  prompts:
+    use: false
+    create: false
+    share: false
+    public: false
+endpoints:
+  custom:
+    - name: Codex
+      apiKey: '${LIBRECHAT_BRIDGE_TOKEN}'
+      baseURL: 'http://127.0.0.1:8768/v1'
+      headers:
+        X-Library-Owner: '{{LIBRECHAT_USER_ID}}'
+        X-Library-Conversation: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
+        X-Library-Message: '{{LIBRECHAT_BODY_MESSAGEID}}'
+        X-Library-Parent: '{{LIBRECHAT_BODY_PARENTMESSAGEID}}'
+      models:
+        default: ['gpt-6.1-sol']
+        fetch: false
+      titleConvo: false
+      summarize: false
+      modelDisplayLabel: GPT-6.1
+      addParams:
+        reasoning_effort: medium
+      dropParams: ['temperature', 'top_p', 'frequency_penalty', 'presence_penalty']
+modelSpecs:
+  list:
+    - name: codex-chat
+      label: GPT-6.1
+      description: '使用现有 ChatGPT 登录；中等推理强度'
+      default: true
+      preset:
+        endpoint: Codex
+        model: gpt-6.1-sol
+fileConfig:
+  endpoints:
+    Codex:
+      fileLimit: 4
+      fileSizeLimit: 10
+      totalSizeLimit: 20
+      supportedMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'text/plain', 'text/markdown']
+  serverFileSizeLimit: 20

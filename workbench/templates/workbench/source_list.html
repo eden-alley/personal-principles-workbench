@@ -1,0 +1,16 @@
+{% extends 'workbench/base.html' %}
+{% block title %}素材库 · 个人原则工作台{% endblock %}
+{% block content %}
+  <div class="page-heading"><div><span class="eyebrow">原始素材</span><h1>素材库</h1><p class="lede">先把看到和想到的保存下来。启发来源不自动成为支持证据。</p></div><a class="button button-primary" href="{% url 'source_create' %}">新增素材</a></div>
+  <form class="search-bar" method="get"><label for="source-search">搜索素材</label><div class="search-input"><input id="source-search" name="q" value="{{ q|default:'' }}" placeholder="按标题、正文或标签搜索"><button type="submit">搜索</button></div></form>
+  {% if items %}
+    <div class="record-list library-list">
+      {% for source in items %}
+        <a class="record-row source-row" href="{% url 'source_detail' source.id %}"><span class="source-kind">{{ source.get_kind_display|default:source.kind }}</span><span class="row-main"><strong>{{ source.title|default:'未命名素材' }}</strong><span>{{ source.text|default:source.transcript|truncatewords:30 }}</span></span><span class="date-text">{{ source.created_at|date:'Y-m-d' }}</span></a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state empty-state-large"><h2>素材库还是空的</h2><p>保存一段原文、一个链接或一张截图，再决定它能帮你想到什么。</p><a class="button button-secondary" href="{% url 'source_create' %}">保存第一份素材</a></div>
+  {% endif %}
+  {% include 'workbench/_pagination.html' %}
+{% endblock %}

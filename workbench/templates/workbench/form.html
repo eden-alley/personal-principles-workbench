@@ -1,0 +1,35 @@
+{% extends 'workbench/base.html' %}
+{% block title %}{{ heading }} · 个人原则工作台{% endblock %}
+{% block content %}
+  <div class="page-heading page-heading-form">
+    <div>
+      <a class="back-link" href="{{ cancel_url }}">返回</a>
+      <h1>{{ heading }}</h1>
+      {% if intro %}<p class="lede">{{ intro }}</p>{% endif %}
+    </div>
+  </div>
+  {% if original %}
+    <section class="comparison-panel" aria-labelledby="original-heading">
+      <div class="section-heading compact-heading">
+        <div><span class="eyebrow">当前版本</span><h2 id="original-heading">保存前的原内容</h2></div>
+        <span class="version-chip">版本 {{ original.number }}</span>
+      </div>
+      <div class="comparison-copy">
+        {% if original.title %}<h3>{{ original.title }}</h3>{% endif %}
+        {% if original.statement %}<p>{{ original.statement|linebreaksbr }}</p>{% endif %}
+        {% if original.when_to_use %}<p><strong>适用时机</strong>{{ original.when_to_use|linebreaksbr }}</p>{% endif %}
+        {% if original.conditions %}<p><strong>条件</strong>{{ original.conditions|linebreaksbr }}</p>{% endif %}
+        {% if original.boundaries %}<p><strong>边界</strong>{{ original.boundaries|linebreaksbr }}</p>{% endif %}
+        {% if original.questions %}<p><strong>待确认</strong>{{ original.questions|linebreaksbr }}</p>{% endif %}
+      </div>
+    </section>
+  {% endif %}
+  <form class="stack-form" method="post" enctype="multipart/form-data" data-busy-form>
+    {% csrf_token %}
+    {% include 'workbench/_field_list.html' with form=form %}
+    <div class="form-actions">
+      <button class="button button-primary" type="submit" data-submit-label="{{ submit_label|default:'保存' }}">{{ submit_label|default:'保存' }}</button>
+      <a class="button button-quiet" href="{{ cancel_url }}">取消</a>
+    </div>
+  </form>
+{% endblock %}

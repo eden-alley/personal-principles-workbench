@@ -1,0 +1,6 @@
+{% extends 'workbench/base.html' %}
+{% block title %}删除前确认 · 个人原则工作台{% endblock %}
+{% block content %}
+  <div class="page-heading"><div><a class="back-link" href="{{ cancel_url|default:'/' }}">返回上一页</a><span class="eyebrow">删除前确认</span><h1>{{ heading|default:'删除前确认' }}</h1><p class="lede">请看清影响，再决定是否永久删除。</p></div></div>
+  <div class="danger-panel"><div><h2>{{ object_title }}</h2><p class="danger-copy">永久删除会移除这个对象及其允许清理的关联内容。停用原则和永久删除是两件不同的事。</p></div>{% if impact %}<div class="impact-list"><h3>预计影响</h3><ul>{% for item in impact %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}<form class="form-actions" method="post" data-busy-form>{% csrf_token %}{% include 'workbench/_field_list.html' with form=form %}<button class="button button-danger" type="submit" data-submit-label="确认永久删除">确认永久删除</button><a class="button button-quiet" href="{{ cancel_url|default:'/' }}">取消</a></form></div>
+{% endblock %}

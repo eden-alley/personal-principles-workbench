@@ -1,0 +1,68 @@
+const {chromium}=require('playwright');
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const crypto=require('node:crypto');
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ const report={checks:[],errors:[]};
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});
+  let bearer='';
+  page.on('request',r=>{if(r.url().startsWith('http://127.0.0.1:3081/api/')){const h=r.headers().authorization;if(h)bearer=h;}});
+  page.on('pageerror',e=>report.errors.push(e.message));
+  const credentials=JSON.parse(fs.readFileSync('artifacts/librechat-runtime/test-account.json'));
+  await page.goto('http://127.0.0.1:3081/login');
+  await page.locator('[name=email]').fill(credentials.email);
+  await page.locator('[name=password]').fill(credentials.password);
+  await page.locator('button[type=submit]').click();
+  await page.locator('#prompt-textarea').waitFor();
+  async function api(path){const r=await page.request.get('http://127.0.0.1:3081/api/'+path,{headers:{Authorization:bearer}});assert.ok(r.ok());return r.json();}
+  await page.getByTestId('header-library-button').click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByRole('button',{name:'新增原则',exact:true}).click();
+  const title='界面验收示例 '+Date.now();
+  await dialog.getByLabel('原则表述',{exact:true}).fill(title);
+  await dialog.getByRole('button',{name:'确认保存',exact:true}).click();
+  await dialog.getByRole('heading',{name:title,exact:true}).waitFor();
+  const created=(await api('library')).entries.find(e=>e.title===title);
+  assert.ok(created);report.checks.push('UI create');
+  await dialog.getByRole('button',{name:'编辑并保存新版本',exact:true}).click();
+  assert.equal(await dialog.getByRole('button',{name:'确认保存',exact:true}).isEnabled(),false);
+  await dialog.getByLabel('原则表述',{exact:true}).fill(title+'，修订内容');
+  await dialog.getByLabel('修订原因（必填）',{exact:true}).fill('界面验收：保留旧版本');
+  await dialog.getByRole('button',{name:'确认保存',exact:true}).click();
+  await dialog.getByRole('button',{name:'编辑并保存新版本',exact:true}).waitFor();
+  await dialog.locator('summary').filter({hasText:'查看历史版本'}).click();
+  const revised=await api('library/entries/'+created.id);
+  assert.equal(revised.versions.length,2);assert.equal(revised.versions.find(v=>v.version===1).text,title);
+  report.checks.push('UI revision reason and immutable history');
+  await dialog.getByRole('button',{name:'移入回收站',exact:true}).click();
+  assert.equal(await dialog.getByRole('button',{name:'确认移入回收站',exact:true}).isEnabled(),false);
+  await dialog.getByLabel(/输入完整标题/).fill(revised.title);
+  await dialog.getByRole('button',{name:'确认移入回收站',exact:true}).click();
+  await dialog.getByRole('button',{name:'恢复记录',exact:true}).click();
+  await dialog.getByRole('button',{name:'移入回收站',exact:true}).waitFor();
+  assert.equal((await api('library/entries/'+created.id)).removed,false);
+  report.checks.push('UI recycle and restore');
+  await dialog.getByRole('button',{name:'素材',exact:true}).click();
+  const source=(await api('library')).entries.find(e=>e.kind==='source'&&e.assets.length);
+  await dialog.getByRole('button',{name:source.title+' 素材',exact:true}).first().click();
+  const downloadWait=page.waitForEvent('download');
+  await dialog.getByRole('button',{name:/下载原件/}).first().click();
+  const download=await downloadWait;
+  const bytes=fs.readFileSync(await download.path());
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),source.assets[0].sha256);
+  report.checks.push('UI original download hash');
+  const exportWait=page.waitForEvent('download');
+  await dialog.getByRole('button',{name:'导出资料 JSON',exact:true}).click();
+  const exported=JSON.parse(fs.readFileSync(await (await exportWait).path(),'utf8'));
+  assert.ok(exported.entries.find(e=>e.id===created.id));report.checks.push('UI export');
+  await page.screenshot({path:'artifacts/library-ui-desktop.png'});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'artifacts/library-ui-mobile.png'});
+  assert.ok(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1),'Dialog horizontal overflow');
+  report.checks.push('390px mobile no horizontal overflow');
+  assert.deepEqual(report.errors,[]);report.pass=true;
+ }catch(e){report.failure=e.message;console.error(e);process.exitCode=1;}
+ finally{fs.writeFileSync('artifacts/library-ui-acceptance.json',JSON.stringify(report,null,2));await browser.close();}
+})();

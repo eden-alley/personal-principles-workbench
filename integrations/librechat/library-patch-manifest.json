@@ -1,0 +1,31 @@
+{
+  "base": "e8f3be08623663d4ad7f7241e693c94469b63bb0",
+  "files": [
+    "api/server/index.js",
+    "client/src/components/Chat/Header.tsx",
+    "client/src/components/Chat/Messages/Message.tsx",
+    "client/src/components/Messages/MessageContent.tsx",
+    "client/src/locales/en/translation.json",
+    "packages/api/src/index.ts",
+    "packages/data-provider/src/config.ts",
+    "packages/data-provider/src/index.ts",
+    "packages/data-provider/src/keys.ts",
+    "packages/data-schemas/src/app/interface.ts",
+    "api/server/routes/library.js",
+    "client/src/components/Library/Collect.tsx",
+    "client/src/components/Library/Controls.tsx",
+    "client/src/components/Library/Dialog.tsx",
+    "client/src/components/Library/Editor.tsx",
+    "client/src/components/Library/Entry.tsx",
+    "client/src/components/Library/Feedback.tsx",
+    "client/src/components/Library/Organization.tsx",
+    "client/src/components/Library/SourceEditor.tsx",
+    "client/src/components/Library/Turn.tsx",
+    "client/src/components/Library/__tests__/Library.spec.tsx",
+    "client/src/components/Library/hooks.ts",
+    "packages/api/src/library/router.spec.ts",
+    "packages/api/src/library/router.ts",
+    "packages/data-provider/src/library.ts"
+  ],
+  "pristine_apply_verified": true
+}

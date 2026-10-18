@@ -1,0 +1,24 @@
+{% extends 'workbench/base.html' %}
+{% block title %}设置与导出 · 个人原则工作台{% endblock %}
+{% block content %}
+  <div class="page-heading"><div><h1>设置与导出</h1><p class="lede">默认设置就能开始使用，需要时再调整。</p></div></div>
+  <div class="settings-layout">
+    <section class="settings-panel">
+      <div class="section-heading compact-heading"><div><h2>AI 接入</h2><p class="muted">{% if selected_provider.provider == 'demo' %}本地演示，不调用模型{% else %}当前模型：{{ selected_provider.model|default:'尚未配置' }}{% if selected_provider.provider == 'codex' %} · 推理强度 {{ selected_provider.reasoning_effort }}{% endif %}{% endif %}</p></div><span class="mode-label" data-ai-mode-label>{{ app_mode }}</span></div>
+      {% if provider_override or model_override or effort_override %}<p class="notice-line">本机环境配置正在覆盖{% if provider_override %}接入方式（{{ provider_override }}）{% endif %}{% if model_override %} Codex 模型（{{ model_override }}）{% endif %}{% if effort_override %}推理强度（{{ effort_override }}）{% endif %}。要使用下列表单中的选择，请移除相应环境覆盖并重启。</p>{% endif %}
+      <form class="stack-form" method="post" data-busy-form>{% csrf_token %}{% include 'workbench/_field_list.html' with form=form %}<div class="form-actions"><button class="button button-primary" type="submit" data-submit-label="确认保存">确认保存</button></div></form>
+      <p class="settings-note">Codex 使用现有 ChatGPT 账号额度，上下文容量遵循 Codex 配置。普通 API 需在本机配置密钥，可能按量计费。</p>
+    </section>
+    <aside class="settings-aside">
+      <section class="aside-section ai-status-panel" data-ai-status-panel data-status-url="/settings/ai/status/" data-login-url="/settings/codex/login/" data-login-status-url="/settings/codex/login/status/" data-login-cancel-url="/settings/codex/login/cancel/">
+        <div class="section-heading compact-heading"><div><h2>模型连接</h2><p data-ai-status-message>{{ ai_status.message }}</p></div><span class="status-pill" data-ai-status-label>{{ ai_status.label }}</span></div>
+        <dl class="meta-list"><dt>提供商</dt><dd data-ai-status-provider>{{ ai_status.provider|default:'未选择' }}</dd><dt>模型</dt><dd data-ai-status-model>{{ ai_status.model|default:'未读取' }}</dd></dl>
+        <div class="ai-status-actions"><button class="button button-secondary" type="button" data-ai-refresh>刷新状态</button>{% if ai_status.provider == 'codex' %}<button class="button button-primary" type="button" data-codex-login {% if ai_status.code == 'connected' %}hidden{% endif %}>登录 Codex</button>{% endif %}</div>
+        <div class="codex-auth-panel" data-codex-auth hidden><p data-codex-auth-message></p><a class="text-link" data-codex-auth-link target="_blank" rel="noreferrer" hidden>打开官方 HTTPS 登录页</a><button class="button button-quiet" type="button" data-codex-login-cancel hidden>取消本次登录</button></div>
+        <div class="form-errors" data-ai-status-error role="alert" hidden></div>
+      </section>
+      <section class="aside-section"><h2>导出全部资料</h2><p>下载包含原则历史版本、情境、选择、观察、素材和原始附件的 ZIP 备份。</p><a class="button button-secondary" href="{% url 'export_data' %}">下载 ZIP 备份</a></section>
+      <details class="aside-section"><summary>查看演示</summary><p>虚构示例，不写入你的资料。</p><a class="text-link" href="{% url 'demo' %}">打开演示页</a></details>
+    </aside>
+  </div>
+{% endblock %}
